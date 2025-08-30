@@ -2,7 +2,7 @@
 
 This addon depends on:
 
-- [account](../../../../../oca-ocb-accounting/odoo-bringout-oca-ocb-account)
-- [l10n_multilang](../../../../../oca-ocb-l10n_me-africa/odoo-bringout-oca-ocb-l10n_multilang)
-- [base_iban](../../../../../oca-ocb-core/odoo-bringout-oca-ocb-base_iban)
-- [l10n_din5008](../../../../../oca-ocb-l10n_asia-pacific/odoo-bringout-oca-ocb-l10n_din5008)
+- [account](https://github.com/bringout/oca-ocb-accounting)
+- [l10n_multilang](https://github.com/bringout/oca-ocb-l10n_me-africa)
+- [base_iban](https://github.com/bringout/oca-ocb-core)
+- [l10n_din5008](https://github.com/bringout/oca-ocb-l10n_asia-pacific)

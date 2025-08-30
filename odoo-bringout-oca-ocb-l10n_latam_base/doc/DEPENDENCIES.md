@@ -2,5 +2,5 @@
 
 This addon depends on:
 
-- [contacts](../../../../../oca-ocb-technical/odoo-bringout-oca-ocb-contacts)
-- [base_vat](../../../../../oca-ocb-core/odoo-bringout-oca-ocb-base_vat)
+- [contacts](https://github.com/bringout/oca-ocb-technical)
+- [base_vat](https://github.com/bringout/oca-ocb-core)

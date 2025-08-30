@@ -2,5 +2,5 @@
 
 This addon depends on:
 
-- [l10n_cn](../../../../../oca-ocb-l10n_asia-pacific/odoo-bringout-oca-ocb-l10n_cn)
-- [base_address_extended](../../../../../oca-ocb-core/odoo-bringout-oca-ocb-base_address_extended)
+- [l10n_cn](https://github.com/bringout/oca-ocb-l10n_asia-pacific)
+- [base_address_extended](https://github.com/bringout/oca-ocb-core)

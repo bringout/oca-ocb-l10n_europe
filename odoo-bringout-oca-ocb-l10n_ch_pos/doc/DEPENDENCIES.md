@@ -2,5 +2,5 @@
 
 This addon depends on:
 
-- [l10n_ch](../../../../odoo-bringout-oca-ocb-l10n_ch)
-- [point_of_sale](../../../../../oca-ocb-sale/odoo-bringout-oca-ocb-point_of_sale)
+- [l10n_ch](https://github.com/bringout/oca-ocb-l10n_europe)
+- [point_of_sale](https://github.com/bringout/oca-ocb-sale)

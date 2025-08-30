@@ -2,6 +2,6 @@
 
 This addon depends on:
 
-- [l10n_multilang](../../../../../oca-ocb-l10n_me-africa/odoo-bringout-oca-ocb-l10n_multilang)
-- [account](../../../../../oca-ocb-accounting/odoo-bringout-oca-ocb-account)
-- [base_vat](../../../../../oca-ocb-core/odoo-bringout-oca-ocb-base_vat)
+- [l10n_multilang](https://github.com/bringout/oca-ocb-l10n_me-africa)
+- [account](https://github.com/bringout/oca-ocb-accounting)
+- [base_vat](https://github.com/bringout/oca-ocb-core)

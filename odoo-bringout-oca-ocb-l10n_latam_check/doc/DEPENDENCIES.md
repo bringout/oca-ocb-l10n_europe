@@ -2,5 +2,5 @@
 
 This addon depends on:
 
-- [account_check_printing](../../../../../oca-ocb-accounting/odoo-bringout-oca-ocb-account_check_printing)
-- [base_vat](../../../../../oca-ocb-core/odoo-bringout-oca-ocb-base_vat)
+- [account_check_printing](https://github.com/bringout/oca-ocb-accounting)
+- [base_vat](https://github.com/bringout/oca-ocb-core)
