@@ -2,4 +2,4 @@
 
 This addon depends on:
 
-- [l10n_es_edi_sii](https://github.com/bringout/oca-ocb-l10n_europe/tree/803442da21acc0e9f67288b316e119dd78b4860c/odoo-bringout-oca-ocb-l10n_es_edi_sii)
+- [l10n_es_edi_sii](https://github.com/bringout/oca-ocb-l10n_europe/tree/dc4fd57ffd5b71278a780f2d078ae6040ffd0404/odoo-bringout-oca-ocb-l10n_es_edi_sii)
