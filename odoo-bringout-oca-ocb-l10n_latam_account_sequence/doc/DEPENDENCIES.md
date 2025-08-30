@@ -2,5 +2,5 @@
 
 This addon depends on:
 
-- [l10n_latam_invoice_document](https://github.com/bringout/oca-ocb-l10n_europe/tree/8740eae566ff6990465bfbf69a8930a0a172a146/odoo-bringout-oca-ocb-l10n_latam_invoice_document)
-- [account_sequence](https://github.com/bringout/oca-ocb-accounting/tree/eb3c9b9e76fbb706c132f3bf6a9538d6d5a0b1a7/odoo-bringout-oca-ocb-account_sequence)
+- [l10n_latam_invoice_document](https://github.com/bringout/oca-ocb-l10n_europe/tree/00efbd25edac91c28a010c101cd8639db9c3324d/odoo-bringout-oca-ocb-l10n_latam_invoice_document)
+- [account_sequence](https://github.com/bringout/oca-ocb-accounting/tree/150f2ecdb69d7dcf1345d7fd66832f9d87a21860/odoo-bringout-oca-ocb-account_sequence)
