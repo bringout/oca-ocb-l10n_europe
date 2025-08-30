@@ -2,5 +2,5 @@
 
 This addon depends on:
 
-- [l10n_fr](../../odoo-bringout-oca-ocb-l10n_fr)
-- [account](../../odoo-bringout-oca-ocb-account)
+- [l10n_fr](../../../../odoo-bringout-oca-ocb-l10n_fr)
+- [account](../../../../../oca-ocb-accounting/odoo-bringout-oca-ocb-account)

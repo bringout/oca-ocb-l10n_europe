@@ -2,5 +2,5 @@
 
 This addon depends on:
 
-- [account](../../odoo-bringout-oca-ocb-account)
-- [account_debit_note](../../odoo-bringout-oca-ocb-account_debit_note)
+- [account](../../../../../oca-ocb-accounting/odoo-bringout-oca-ocb-account)
+- [account_debit_note](../../../../../oca-ocb-accounting/odoo-bringout-oca-ocb-account_debit_note)
