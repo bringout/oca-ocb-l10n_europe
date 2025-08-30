@@ -2,6 +2,6 @@
 
 This addon depends on:
 
-- [l10n_it_edi](https://github.com/bringout/oca-ocb-l10n_europe/tree/d13d52acaf033ed99ee03c2c2a094b66fa3a343e/odoo-bringout-oca-ocb-l10n_it_edi)
-- [delivery](https://github.com/bringout/oca-ocb-warehouse/tree/1135de9279731def9c756b5192f8860b5a0e7e59/odoo-bringout-oca-ocb-delivery)
-- [stock_account](https://github.com/bringout/oca-ocb-accounting/tree/3bdbee2033c3989f108204c90af9cf1db37bf0a0/odoo-bringout-oca-ocb-stock_account)
+- [l10n_it_edi](https://github.com/bringout/oca-ocb-l10n_europe/tree/36e2aa27a176c5064a887605456999c513fa115b/odoo-bringout-oca-ocb-l10n_it_edi)
+- [delivery](https://github.com/bringout/oca-ocb-warehouse/tree/81e6496fce389797413505803016d3ac487ede13/odoo-bringout-oca-ocb-delivery)
+- [stock_account](https://github.com/bringout/oca-ocb-accounting/tree/ddf6c0d80189f2cd640968f14b2d1346fca52a9f/odoo-bringout-oca-ocb-stock_account)
