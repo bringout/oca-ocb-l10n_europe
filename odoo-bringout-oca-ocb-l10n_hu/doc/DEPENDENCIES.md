@@ -2,6 +2,6 @@
 
 This addon depends on:
 
-- [account](https://github.com/bringout/oca-ocb-accounting/tree/150f2ecdb69d7dcf1345d7fd66832f9d87a21860/odoo-bringout-oca-ocb-account)
-- [base_vat](https://github.com/bringout/oca-ocb-core/tree/3269462e6a0442fbf5ae30a27b3c18135ac733b9/odoo-bringout-oca-ocb-base_vat)
-- [l10n_multilang](https://github.com/bringout/oca-ocb-l10n_me-africa/tree/9544b42303b8c63a4a748996d559a4b384f8864e/odoo-bringout-oca-ocb-l10n_multilang)
+- [account](https://github.com/bringout/oca-ocb-accounting/tree/1c86482d8238e19ed78579629f21cd46d51a058e/odoo-bringout-oca-ocb-account)
+- [base_vat](https://github.com/bringout/oca-ocb-core/tree/680f309d65868a57afe7e3be0f9905cc2a7043fb/odoo-bringout-oca-ocb-base_vat)
+- [l10n_multilang](https://github.com/bringout/oca-ocb-l10n_me-africa/tree/9c7284f001ca468190a7302dec2083d02459e775/odoo-bringout-oca-ocb-l10n_multilang)
