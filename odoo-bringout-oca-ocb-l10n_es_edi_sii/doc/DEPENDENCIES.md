@@ -2,5 +2,5 @@
 
 This addon depends on:
 
-- [l10n_es](https://github.com/bringout/oca-ocb-l10n_europe/tree/5de71bc386fb5f5a7c53f5119023df331cad0f38/odoo-bringout-oca-ocb-l10n_es)
-- [account_edi](https://github.com/bringout/oca-ocb-accounting/tree/d63411e729b42117587a2f63f6ff389d6dbac8c2/odoo-bringout-oca-ocb-account_edi)
+- [l10n_es](https://github.com/bringout/oca-ocb-l10n_europe/tree/803442da21acc0e9f67288b316e119dd78b4860c/odoo-bringout-oca-ocb-l10n_es)
+- [account_edi](https://github.com/bringout/oca-ocb-accounting/tree/73715ff0fc7df4a3277aebac4dbb68118fc80fe4/odoo-bringout-oca-ocb-account_edi)

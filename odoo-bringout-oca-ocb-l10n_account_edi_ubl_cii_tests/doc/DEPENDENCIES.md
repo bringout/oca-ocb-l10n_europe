@@ -2,10 +2,10 @@
 
 This addon depends on:
 
-- [l10n_generic_coa](https://github.com/bringout/oca-ocb-l10n_americas/tree/718fe1d61c7c6b442489c1c1710688d9e61b3c9c/odoo-bringout-oca-ocb-l10n_generic_coa)
-- [account_edi_ubl_cii](https://github.com/bringout/oca-ocb-accounting/tree/d63411e729b42117587a2f63f6ff389d6dbac8c2/odoo-bringout-oca-ocb-account_edi_ubl_cii)
-- [l10n_fr](https://github.com/bringout/oca-ocb-l10n_europe/tree/5de71bc386fb5f5a7c53f5119023df331cad0f38/odoo-bringout-oca-ocb-l10n_fr)
-- [l10n_be](https://github.com/bringout/oca-ocb-l10n_europe/tree/5de71bc386fb5f5a7c53f5119023df331cad0f38/odoo-bringout-oca-ocb-l10n_be)
-- [l10n_de](https://github.com/bringout/oca-ocb-l10n_europe/tree/5de71bc386fb5f5a7c53f5119023df331cad0f38/odoo-bringout-oca-ocb-l10n_de)
-- [l10n_nl](https://github.com/bringout/oca-ocb-l10n_europe/tree/5de71bc386fb5f5a7c53f5119023df331cad0f38/odoo-bringout-oca-ocb-l10n_nl)
-- [l10n_au](https://github.com/bringout/oca-ocb-l10n_asia-pacific/tree/54d5192babb41f771ce8a9a9f0cd4295144e4555/odoo-bringout-oca-ocb-l10n_au)
+- [l10n_generic_coa](https://github.com/bringout/oca-ocb-l10n_americas/tree/23d34e2ecea5f06f75e1318df14b02b8a5fcfa69/odoo-bringout-oca-ocb-l10n_generic_coa)
+- [account_edi_ubl_cii](https://github.com/bringout/oca-ocb-accounting/tree/73715ff0fc7df4a3277aebac4dbb68118fc80fe4/odoo-bringout-oca-ocb-account_edi_ubl_cii)
+- [l10n_fr](https://github.com/bringout/oca-ocb-l10n_europe/tree/803442da21acc0e9f67288b316e119dd78b4860c/odoo-bringout-oca-ocb-l10n_fr)
+- [l10n_be](https://github.com/bringout/oca-ocb-l10n_europe/tree/803442da21acc0e9f67288b316e119dd78b4860c/odoo-bringout-oca-ocb-l10n_be)
+- [l10n_de](https://github.com/bringout/oca-ocb-l10n_europe/tree/803442da21acc0e9f67288b316e119dd78b4860c/odoo-bringout-oca-ocb-l10n_de)
+- [l10n_nl](https://github.com/bringout/oca-ocb-l10n_europe/tree/803442da21acc0e9f67288b316e119dd78b4860c/odoo-bringout-oca-ocb-l10n_nl)
+- [l10n_au](https://github.com/bringout/oca-ocb-l10n_asia-pacific/tree/57f88a085710a7cfbeb40dad1e14eca00531a49d/odoo-bringout-oca-ocb-l10n_au)
