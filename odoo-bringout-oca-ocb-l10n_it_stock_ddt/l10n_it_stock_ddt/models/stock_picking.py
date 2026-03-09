@@ -40,8 +40,8 @@ class StockPicking(models.Model):
                 and picking.is_locked
                 and (picking.picking_type_code == 'outgoing'
                      or (
-                         picking.move_ids_without_package
-                         and picking.move_ids_without_package[0].partner_id
+                         picking.move_ids
+                         and picking.move_ids[0].partner_id
                          and picking.location_id.usage == 'supplier'
                          and picking.location_dest_id.usage == 'customer'
                          )
@@ -49,9 +49,9 @@ class StockPicking(models.Model):
                 )
 
     def _action_done(self):
-        super(StockPicking, self)._action_done()
         for picking in self.filtered(lambda p: p.picking_type_id.l10n_it_ddt_sequence_id):
             picking.l10n_it_ddt_number = picking.picking_type_id.l10n_it_ddt_sequence_id.next_by_id()
+        super()._action_done()
 
 
 class StockPickingType(models.Model):
@@ -62,10 +62,10 @@ class StockPickingType(models.Model):
     def _get_dtt_ir_seq_vals(self, warehouse_id, sequence_code):
         if warehouse_id:
             wh = self.env['stock.warehouse'].browse(warehouse_id)
-            ir_seq_name = wh.name + ' ' + _('Sequence') + ' ' + sequence_code
+            ir_seq_name = _('%(warehouse)s Sequence %(code)s', warehouse=wh.name, code=sequence_code)
             ir_seq_prefix = wh.code + '/' + sequence_code + '/DDT'
         else:
-            ir_seq_name = _('Sequence') + ' ' + sequence_code
+            ir_seq_name = _('Sequence %(code)s', code=sequence_code)
             ir_seq_prefix = sequence_code + '/DDT'
         return ir_seq_name, ir_seq_prefix
 

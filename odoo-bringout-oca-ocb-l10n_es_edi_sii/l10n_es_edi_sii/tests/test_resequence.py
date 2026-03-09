@@ -11,15 +11,9 @@ from .common import TestEsEdiCommon, mocked_l10n_es_edi_call_web_service_sign
 @tagged("post_install_l10n", "post_install", "-at_install")
 class TestResequenceSII(TestEsEdiCommon):
     @classmethod
-    def setUpClass(
-        cls,
-        chart_template_ref="l10n_es.account_chart_template_full",
-        edi_format_ref="l10n_es_edi_sii.edi_es_sii",
-    ):
+    def setUpClass(cls):
         cls.startClassPatcher(freeze_time("2019-06-01", tick=True))
-        super().setUpClass(
-            chart_template_ref=chart_template_ref, edi_format_ref=edi_format_ref
-        )
+        super().setUpClass()
         cls.classPatch(
             cls.registry["account.edi.format"],
             "_l10n_es_edi_call_web_service_sign",

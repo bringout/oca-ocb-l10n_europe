@@ -1,10 +1,7 @@
-# -*- coding:utf-8 -*-
-
-from reportlab.graphics.barcode import createBarcodeDrawing
-
 from odoo import Command
 from odoo.tests import tagged
 from odoo.exceptions import UserError
+from odoo.tools.barcode import createBarcodeDrawing
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 
 
@@ -14,11 +11,11 @@ class TestSwissQRCode(AccountTestInvoicingCommon):
     """
 
     @classmethod
-    def setUpClass(cls, chart_template_ref='l10n_ch.l10nch_chart_template'):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    @AccountTestInvoicingCommon.setup_country('ch')
+    def setUpClass(cls):
+        super().setUpClass()
 
         cls.company_data['company'].qr_code = True
-        cls.company_data['company'].country_id = None
 
         cls.swiss_iban = cls.env['res.partner.bank'].create({
             'acc_number': 'CH15 3881 5158 3845 3843 7',
@@ -60,6 +57,9 @@ class TestSwissQRCode(AccountTestInvoicingCommon):
         """
         self.ch_qr_invoice.qr_code_method = 'ch_qr'
 
+        # flush manually  to have the right env to get possible values of `qr_code_method`
+        self.env.flush_all()
+
         # First check with a regular IBAN
         with self.assertRaises(UserError, msg="It shouldn't be possible to generate a Swiss QR-code for partners without a complete Swiss address."):
             self.ch_qr_invoice._generate_qr_code()
@@ -82,6 +82,24 @@ class TestSwissQRCode(AccountTestInvoicingCommon):
         # even if the invoice is not issued from Switzerland we want to generate the code
         self.ch_qr_invoice.company_id.partner_id.country_id = self.env.ref('base.fr')
         self.ch_qr_invoice._generate_qr_code()
+
+    def test_qr_code_generation_with_newlines(self):
+        """ Check that the generated QR removes newlines from field content, as newlines
+        shift the field content causing the submitted QR code to be rejected.
+        """
+        # add the address with a newline
+        self._assign_partner_address(self.ch_qr_invoice.company_id.partner_id)
+        self._assign_partner_address(self.ch_qr_invoice.partner_id)
+        self.ch_qr_invoice.partner_id.write({"street2": "123 \nStreet"})
+
+        # generate the field values, instead of the QR image.
+        unstruct_ref = self.ch_qr_invoice.ref and self.ch_qr_invoice.ref or self.ch_qr_invoice.name
+        vals = self.ch_qr_invoice.partner_bank_id._build_qr_code_vals(
+            self.ch_qr_invoice.amount_residual, unstruct_ref, self.ch_qr_invoice.payment_reference,
+            self.ch_qr_invoice.currency_id, self.ch_qr_invoice.partner_id, self.ch_qr_invoice.qr_code_method)
+        value_list = self.ch_qr_invoice.partner_bank_id._get_qr_vals(**vals)
+
+        self.assertEqual(''.join(value_list).count('\n'), 0, "Each element of the Swiss QR-code must be contained on one line.")
 
     def test_ch_qr_code_detection(self):
         """ Checks Swiss QR-code auto-detection when no specific QR-method

@@ -1,4 +1,3 @@
-# -*- coding:utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import api, fields, models, _
@@ -25,14 +24,27 @@ TAX_SYSTEM = [
     ("RF19", "[RF19] Regime forfettario (art.1, c.54-89, L. 190/2014)"),
 ]
 
+
 class ResCompany(models.Model):
-    _name = 'res.company'
     _inherit = 'res.company'
 
     l10n_it_codice_fiscale = fields.Char(string="Codice Fiscale", size=16, related='partner_id.l10n_it_codice_fiscale',
         store=True, readonly=False, help="Fiscal code of your company")
     l10n_it_tax_system = fields.Selection(selection=TAX_SYSTEM, string="Tax System",
         help="Please select the Tax system to which you are subjected.")
+    l10n_it_edi_proxy_user_id = fields.Many2one(
+        comodel_name="account_edi_proxy_client.user",
+        compute="_compute_l10n_it_edi_proxy_user_id",
+    )
+    l10n_it_edi_register = fields.Boolean(default=False)
+    l10n_it_edi_purchase_journal_id = fields.Many2one(
+        comodel_name='account.journal',
+        string='Italian Default Purchase Journal',
+        domain=[('type', '=', 'purchase')],
+        compute='_compute_l10n_it_edi_purchase_journal_id',
+        store=True,
+        readonly=False,
+    )
 
     # Economic and Administrative Index
     l10n_it_has_eco_index = fields.Boolean(
@@ -70,6 +82,12 @@ class ResCompany(models.Model):
         Italy")
     l10n_it_tax_representative_partner_id = fields.Many2one('res.partner', string='Tax representative partner')
 
+    @api.constrains('l10n_it_edi_purchase_journal_id')
+    def _check_l10n_it_edi_purchase_journal_id(self):
+        for company in self:
+            if company.l10n_it_edi_purchase_journal_id and not company.l10n_it_edi_purchase_journal_id.default_account_id:
+                raise ValidationError(_("The Italian default purchase journal requires a default account."))
+
     @api.constrains('l10n_it_has_eco_index',
                     'l10n_it_eco_index_office',
                     'l10n_it_eco_index_number',
@@ -91,7 +109,8 @@ class ResCompany(models.Model):
             must be both present or not present. """
         for record in self:
             if (record.l10n_it_has_eco_index
-                and bool(record.l10n_it_eco_index_share_capital) ^ bool(record.l10n_it_eco_index_sole_shareholder)):
+                and (bool(record.l10n_it_eco_index_share_capital)
+                    ^ (record.l10n_it_eco_index_sole_shareholder and record.l10n_it_eco_index_sole_shareholder != 'NO'))):
                 raise ValidationError(_("If one of Share Capital or Sole Shareholder is present, "
                                         "then they must be both filled out."))
 
@@ -108,8 +127,78 @@ class ResCompany(models.Model):
             if not record.l10n_it_tax_representative_partner_id.country_id:
                 raise ValidationError(_("Your tax representative partner must have a country."))
 
+    @api.depends("account_edi_proxy_client_ids", "l10n_it_codice_fiscale")
+    def _compute_l10n_it_edi_proxy_user_id(self):
+        for company in self:
+            edi_company = company._l10n_it_get_edi_company()
+            company.l10n_it_edi_proxy_user_id = edi_company.account_edi_proxy_client_ids.filtered(lambda x: x.proxy_type == 'l10n_it_edi')
+
+            # If we can't find any proxy user, create a new demo proxy user for this italian company.
+            # They must have the Codice Fiscale field filled for the registration process to work.
+            if not company.l10n_it_edi_proxy_user_id and company.l10n_it_codice_fiscale:
+                company.l10n_it_edi_proxy_user_id = self.env['account_edi_proxy_client.user']._register_proxy_user(
+                    company=company,
+                    proxy_type='l10n_it_edi',
+                    edi_mode='demo',
+                )
+
+    @api.depends('country_code')
+    def _compute_l10n_it_edi_purchase_journal_id(self):
+        for company in self:
+            if not company.l10n_it_edi_purchase_journal_id and company.country_code == 'IT':
+                company.l10n_it_edi_purchase_journal_id = self.env['account.journal'].search([
+                    *self.env['account.journal']._check_company_domain(company),
+                    ('type', '=', 'purchase'),
+                    ('default_account_id', '!=', False),
+                ], limit=1)
+            else:
+                company.l10n_it_edi_purchase_journal_id = company.l10n_it_edi_purchase_journal_id
+
+    def _l10n_it_edi_export_check(self):
+        checks = {
+            'company_vat_codice_fiscale_missing': {
+                'fields': [('vat', 'l10n_it_codice_fiscale')],
+                'message': _("Company/ies should have a VAT number or Codice Fiscale."),
+            },
+            'company_address_missing': {
+                'fields': [('street', 'street2'), ('zip',), ('city',), ('country_id',)],
+                'message': _("Company/ies should have a complete address, verify their Street, City, Zipcode and Country."),
+            },
+            'company_l10n_it_tax_system_missing': {
+                'fields': [('l10n_it_tax_system',)],
+                'message': _("Company/ies should have a Tax System"),
+            },
+        }
+        errors = {}
+        for key, check in checks.items():
+            for fields_tuple in check.pop('fields'):
+                if invalid_records := self.filtered(lambda record: not any(record[field] for field in fields_tuple)):
+                    errors[f"l10n_it_edi_{key}"] = {
+                        'message': check['message'],
+                        'action_text': _("View Company/ies"),
+                        'action': invalid_records._get_records_action(name=_("Check Company Data")),
+                    }
+        if self.filtered(lambda x: not x.l10n_it_edi_proxy_user_id):
+            errors['l10n_it_edi_settings_l10n_it_edi_proxy_user_id'] = {
+                'message': _("You need to set the Codice Fiscale on your company."),
+                'action_text': _("View Company/ies"),
+                'action': self._get_records_action(name=_("Check Company Data")),
+            }
+        return errors
+
     @api.onchange("l10n_it_has_tax_representative")
     def _onchange_l10n_it_has_tax_represeentative(self):
         for company in self:
             if not company.l10n_it_has_tax_representative:
                 company.l10n_it_tax_representative_partner_id = False
+
+    def _l10n_it_get_edi_company(self):
+        self.ensure_one()
+        if (
+            self.root_id.id != self.id
+            and self.l10n_it_codice_fiscale == self.root_id.l10n_it_codice_fiscale
+            and self.vat == self.root_id.vat
+        ):
+            return self.root_id
+        else:
+            return self

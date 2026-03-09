@@ -121,7 +121,7 @@ class AccountMove(models.Model):
                         order = sale_line.order_id
                         if order.l10n_it_edi_doi_id == declaration:
                             linked_orders |= order
-                        qty_invoiced = invoice_line.product_uom_id._compute_quantity(invoice_line.quantity, sale_line.product_uom) * -move.direction_sign
+                        qty_invoiced = invoice_line.product_uom_id._compute_quantity(invoice_line.quantity, sale_line.product_uom_id) * -move.direction_sign
                         sale_line_id = sale_line.ids[0]  # do not just use `id` in case of NewId
                         additional_invoiced_qty[sale_line_id] = additional_invoiced_qty.get(sale_line_id, 0) + qty_invoiced
                 for order in linked_orders:
@@ -192,9 +192,6 @@ class AccountMove(models.Model):
             )
             if declaration_lines and not declaration:
                 errors.append(_('Given the tax %s is applied, there should be a Declaration of Intent selected.',
-                                declaration_of_intent_tax.name))
-            if any(line.tax_ids != declaration_of_intent_tax for line in declaration_lines):
-                errors.append(_('A line using tax %s should not contain any other taxes',
                                 declaration_of_intent_tax.name))
         if errors:
             raise UserError('\n'.join(errors))

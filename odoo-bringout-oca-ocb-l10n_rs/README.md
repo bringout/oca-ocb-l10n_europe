@@ -1,7 +1,9 @@
 # Serbia - Accounting
 
 
-        This is the base module of the Serbian localization. It manages chart of accounts and taxes.
+This is the base module of the Serbian localization. It manages chart of accounts and taxes.
+This module is based on the official document "Pravilnik o kontnom okviru i sadržini računa u kontnom okviru za privredna društva, zadruge i preduzetnike ("Sl. glasnik RS", br. 89/2020)"
+Source: https://www.paragraf.rs/propisi/pravilnik-o-kontnom-okviru-sadrzini-racuna-za-privredna-drustva-zadruge.html
     
 
 ## Installation
@@ -12,38 +14,15 @@ pip install odoo-bringout-oca-ocb-l10n_rs
 
 ## Dependencies
 
-This addon depends on:
 - account
 - base_vat
 
-## Manifest Information
-
-- **Name**: Serbia - Accounting
-- **Version**: 1.0
-- **Category**: Accounting/Localizations/Account Charts
-- **License**: LGPL-3
-- **Installable**: False
-
 ## Source
 
-Based on [OCA/OCB](https://github.com/OCA/OCB) branch 16.0, addon `l10n_rs`.
+- Repository: https://github.com/OCA/OCB
+- Branch: 19.0
+- Path: addons/l10n_rs
 
 ## License
 
-This package maintains the original LGPL-3 license from the upstream Odoo project.
-
-## Documentation
-
-- Overview: doc/OVERVIEW.md
-- Architecture: doc/ARCHITECTURE.md
-- Models: doc/MODELS.md
-- Controllers: doc/CONTROLLERS.md
-- Wizards: doc/WIZARDS.md
-- Reports: doc/REPORTS.md
-- Security: doc/SECURITY.md
-- Install: doc/INSTALL.md
-- Usage: doc/USAGE.md
-- Configuration: doc/CONFIGURATION.md
-- Dependencies: doc/DEPENDENCIES.md
-- Troubleshooting: doc/TROUBLESHOOTING.md
-- FAQ: doc/FAQ.md
+This package preserves the original LGPL-3 license.

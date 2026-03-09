@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="l10n_mz_tax_report" model="account.report">
-        <field name="name">Tax report</field>
+        <field name="name">Tax Report</field>
         <field name="root_report_id" ref="account.generic_tax_report"/>
         <field name="country_id" ref="base.mz"/>
-        <field name="filter_fiscal_position" eval="True"/>
+        <field name="allow_foreign_vat" eval="True"/>
         <field name="availability_condition">country</field>
         <field name="column_ids">
             <record id="l10n_mz_tax_report_balance" model="account.report.column">
@@ -15,6 +15,7 @@
         <field name="line_ids">
             <record id="l10n_mz_tax_report_frame_5" model="account.report.line">
                 <field name="name">Frame 5 - CALCULATION OF THE TAX REGARDING THE PERIOD TO WHICH THE DECLARATION REFERS</field>
+                <field name="hierarchy_level">0</field>
                 <field name="children_ids">
                     <record id="l10n_mz_tax_report_line_1" model="account.report.line">
                         <field name="name">1. Transfer of goods and/or rendering of services carried out by the taxable person and respective tax assessed</field>
@@ -26,7 +27,7 @@
                                     <record id="l10n_mz_tax_report_1_tag" model="account.report.expression">
                                         <field name="label">balance</field>
                                         <field name="engine">tax_tags</field>
-                                        <field name="formula">1</field>
+                                        <field name="formula">-1</field>
                                     </record>
                                 </field>
                             </record>
@@ -37,7 +38,7 @@
                                     <record id="l10n_mz_tax_report_2_tag" model="account.report.expression">
                                         <field name="label">balance</field>
                                         <field name="engine">tax_tags</field>
-                                        <field name="formula">2</field>
+                                        <field name="formula">-2</field>
                                     </record>
                                 </field>
                             </record>
@@ -53,7 +54,7 @@
                                     <record id="l10n_mz_tax_report_3_tag" model="account.report.expression">
                                         <field name="label">balance</field>
                                         <field name="engine">tax_tags</field>
-                                        <field name="formula">3</field>
+                                        <field name="formula">-3</field>
                                     </record>
                                 </field>
                             </record>
@@ -64,7 +65,7 @@
                                     <record id="l10n_mz_tax_report_4_tag" model="account.report.expression">
                                         <field name="label">balance</field>
                                         <field name="engine">tax_tags</field>
-                                        <field name="formula">4</field>
+                                        <field name="formula">-4</field>
                                     </record>
                                 </field>
                             </record>
@@ -227,6 +228,7 @@
             </record>
             <record id="l10n_mz_tax_report_frame_6" model="account.report.line">
                 <field name="name">Frame 6 - Tax to be delivered to the state (This table should only be completed if field 14 of table 05 has been completed)</field>
+                <field name="hierarchy_level">0</field>
                 <field name="children_ids">
                     <record id="l10n_mz_tax_report_field_18" model="account.report.line">
                         <field name="name">Field 18 - Payable VAT</field>
@@ -261,6 +263,7 @@
             </record>
             <record id="l10n_mz_tax_report_frame_7" model="account.report.line">
                 <field name="name">Frame 7 - Tax to be recovered by taxable person</field>
+                <field name="hierarchy_level">0</field>
                 <field name="children_ids">
                     <record id="l10n_mz_tax_report_field_21" model="account.report.line">
                         <field name="name">Field 21 - Tax credit</field>

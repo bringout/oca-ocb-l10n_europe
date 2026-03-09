@@ -1,11 +1,11 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-
 {
     'name': 'Denmark - Accounting',
-    'version': '1.1',
-    'author': 'Odoo House ApS, VK DATA ApS',
-    'website': 'http://odoodanmark.dk',
+    'icon': '/account/static/description/l10n.png',
+    'countries': ['dk'],
+    'version': '1.3',
+    'author': 'Odoo House ApS, VK DATA ApS, FlexERP ApS',
+    'website': 'https://www.odoo.com/documentation/latest/applications/finance/fiscal_localizations.html',
     'category': 'Accounting/Localizations/Account Charts',
     'description': """
 
@@ -19,87 +19,85 @@ This is the module to manage the **accounting chart for Denmark**. Cover both on
 - **Dansk kontoplan**
 
 - Dansk moms
-        - 25% moms
-        - Resturationsmoms 6,25%
+        - 25 % moms
+        - Restaurationsmoms 6,25 %
         - Omvendt betalingspligt
 
 - Konteringsgrupper
         - EU (Virksomhed)
         - EU (Privat)
-        - 3.lande
+        - Tredjelande
 
-- Finans raporter
-        - Resulttopgørelse
+- Finansrapporter
+        - Resultatopgørelse
         - Balance
         - Momsafregning
             - Afregning
             - Rubrik A, B og C
 
-- **Anglo-Saxon regnskabsmetode**
+- **Anglo-saksisk regnskabsmetode**
 
 .
 
-Produkt setup:
-==============
+Produktopsætning:
+=================
 
 **Vare**
 
-**Salgsmoms:**      Salgmoms 25%
+**Salgsmoms:**      Salgsmoms 25 %
 
-**Salgskonto:**     1010 Salg af vare, m/moms
+**Salgskonto:**     1.010 Salg af varer inkl. moms
 
-**Købsmoms:**       Købsmoms 25%
+**Købsmoms:**       Købsmoms 25 %
 
-**Købskonto:**      2010 Direkte omkostninger vare, m/moms
+**Købskonto:**      2.010 Direkte vareomkostninger inkl. moms
 
 .
 
 **Ydelse**
 
-**Salgsmoms:**      Salgmoms 25%, ydelser
+**Salgsmoms:**      Salgsmoms 25 %, ydelser
 
-**Salgskonto:**     1011 Salg af ydelser, m/moms
+**Salgskonto:**     1.011 Salg af ydelser inkl. moms
 
-**Købsmoms:**       Købsmoms 25%, ydelser
+**Købsmoms:**       Købsmoms 25 %, ydelser
 
-**Købskonto:**      2011 Direkte omkostninger ydelser, m/moms
+**Købskonto:**      2.011 Direkte omkostninger ydelser inkl. moms
 
 .
 
 **Vare med omvendt betalingspligt**
 
-**Salgsmoms:**      Salg omvendt betalingspligt
+**Salgsmoms:**      Salg med omvendt betalingspligt
 
-**Salgskonto:**     1012 Salg af vare, u/moms
+**Salgskonto:**     1.012 Salg af varer ekskl. moms
 
-**Købsmoms:**       Køb omvendt betalingspligt
+**Købsmoms:**       Køb med omvendt betalingspligt
 
-**Købskonto:**      2012 Direkte omkostninger vare, u/moms
+**Købskonto:**      2.012 Direkte vareomkostninger ekskl. moms
 
 
 .
 
 **Restauration**
 
-**Købsmoms:**       Restaurationsmoms 6,25%, købsmoms
+**Købsmoms:**       Restaurationsmoms 6,25 %, købsmoms
 
 **Købskonto:**      4010 Restaurationsbesøg
-
-.
-
     """,
-    'depends': ['account', 'base_iban', 'base_vat'],
+    'depends': [
+        'base_iban',
+        'base_vat',
+        'account',
+        'account_edi_ubl_cii',
+    ],
+    'auto_install': ['account'],
     'data': [
-        'data/account_account_tags.xml',
-        'data/l10n_dk_chart_template_data.xml',
-        'data/account.account.template.csv',
-        'data/l10n_dk_chart_template_post_data.xml',
         'data/account_tax_report_data.xml',
-        'data/account_tax_template_data.xml',
-        'data/account_fiscal_position_template.xml',
-        'data/account_fiscal_position_tax_template.xml',
-        'data/account_fiscal_position_account_template.xml',
-        'data/account_chart_template_configuration_data.xml',
+        'data/account.account.tag.csv',
+        'views/account_journal_views.xml',
+        'views/res_partner_views.xml',
+        'views/res_company_views.xml',
     ],
     'demo': [
         'demo/demo_company.xml',
