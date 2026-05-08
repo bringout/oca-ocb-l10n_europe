@@ -1,24 +1,29 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import base64
 import uuid
 from freezegun import freeze_time
+from lxml import etree
 from unittest.mock import patch
+
+from cryptography.fernet import Fernet
 
 from odoo import fields, sql_db, tools, Command
 from odoo.exceptions import ValidationError
 from odoo.tests import new_test_user, tagged
+
 from odoo.addons.l10n_it_edi.tests.common import TestItEdi
+from odoo.addons.account_edi_proxy_client.tests.test_account_edi_proxy_client import TestAccountEdiProxyUser
 
 import logging
 _logger = logging.getLogger(__name__)
 
 
 @tagged('post_install_l10n', 'post_install', '-at_install')
-class TestItEdiImport(TestItEdi):
+class TestItEdiImport(TestItEdi, TestAccountEdiProxyUser):
     """ Main test class for the l10n_it_edi vendor bills XML import"""
 
-    fake_test_content = """<?xml version="1.0" encoding="UTF-8"?>
+    fake_test_content = b"""<?xml version="1.0" encoding="UTF-8"?>
         <p:FatturaElettronica versione="FPR12" xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
         xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -92,7 +97,7 @@ class TestItEdiImport(TestItEdi):
             'move_type': 'in_invoice',
             'invoice_date': fields.Date.from_string('2014-12-18'),
             'amount_untaxed': 28.75,
-            'amount_tax': 6.32,
+            'amount_tax': 6.33,
             'invoice_line_ids': [{
                 'quantity': 5.0,
                 'price_unit': 1.0,
@@ -135,7 +140,7 @@ class TestItEdiImport(TestItEdi):
             'name': 'DESCRIZIONE DELLA FORNITURA',
             'supplier_taxes_id': [Command.set(self.default_tax.ids)],
         })
-        purchase = self.env['purchase.order'].with_company(self.company).with_context(tracking_disable=True).create(
+        purchase = self.env['purchase.order'].with_company(self.company).create(
             {
                 'partner_id': self.italian_partner_a.id,
                 'partner_ref': 'PO-001',
@@ -250,7 +255,7 @@ class TestItEdiImport(TestItEdi):
             self.env['account.move'].with_company(self.company)._l10n_it_edi_process_downloads({
                 '999999999': {
                     'filename': filename,
-                    'file': self.fake_test_content,
+                    'file': "whatever",  # _decrypt_data is patched
                     'key': str(uuid.uuid4()),
                 }},
                 self.proxy_user,
@@ -268,6 +273,8 @@ class TestItEdiImport(TestItEdi):
             self.company.l10n_it_edi_purchase_journal_id = preferred_journal
 
         preferred_journal.default_account_id = self.company_data_2['default_journal_purchase'].default_account_id.id
+        # Retry setting the company's default purchase journal: no error since default_account_id is set
+        self.company.l10n_it_edi_purchase_journal_id = preferred_journal
 
         with tools.file_open(f'{self.module}/tests/import_xmls/{filename}', mode='rb') as fd:
             fake_bill_content = fd.read()
@@ -277,7 +284,7 @@ class TestItEdiImport(TestItEdi):
             self.env['account.move'].with_company(self.company)._l10n_it_edi_process_downloads({
                 '999999999': {
                     'filename': filename,
-                    'file': fake_bill_content,
+                    'file': "whatever",  # _decrypt_data is patched
                     'key': str(uuid.uuid4()),
                 }},
                 self.proxy_user,
@@ -310,7 +317,7 @@ class TestItEdiImport(TestItEdi):
         })
         self.env['ir.attachment'].with_company(other_company).create({
             'name': filename,
-            'datas': self.fake_test_content,
+            'raw': self.fake_test_content,
             'res_model': 'account.move',
             'res_id': invoice.id,
             'res_field': 'l10n_it_edi_attachment_file',
@@ -321,7 +328,7 @@ class TestItEdiImport(TestItEdi):
             self.env['account.move'].with_company(self.company)._l10n_it_edi_process_downloads(
                 {'999999999': {
                     'filename': filename,
-                    'file': self.fake_test_content,
+                    'file': "whatever",  # _decrypt_data is patched
                     'key': str(uuid.uuid4()),
                 }},
                 self.proxy_user,
@@ -361,7 +368,7 @@ class TestItEdiImport(TestItEdi):
                 processed = self.env['account.move']._l10n_it_edi_process_downloads({
                     '999999999': {
                         'filename': filename,
-                        'file': self.fake_test_content,
+                        'file': "whatever",  # _decrypt_data is patched
                         'key': str(uuid.uuid4()),
                     }},
                     proxy_user,
@@ -496,6 +503,40 @@ class TestItEdiImport(TestItEdi):
             ],
         }], applied_xml)
 
+    def test_receive_bill_with_discount_rounding_issue(self):
+        applied_xml = """
+            <xpath expr="//FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee[1]" position="inside">
+                <ScontoMaggiorazione>
+                    <Tipo>SC</Tipo>
+                    <Percentuale>50.00</Percentuale>
+                </ScontoMaggiorazione>
+            </xpath>
+
+            <xpath expr="//FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee[1]/PrezzoUnitario" position="replace">
+                <PrezzoUnitario>11.85</PrezzoUnitario>
+            </xpath>
+            <xpath expr="//FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee[1]/Quantita" position="replace">
+                <Quantita>3</Quantita>
+            </xpath>
+            <xpath expr="//FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee[1]/PrezzoTotale" position="replace">
+                <PrezzoTotale>17.78</PrezzoTotale>
+            </xpath>
+        """
+
+        self._assert_import_invoice('IT01234567890_FPR01.xml', [{
+            'invoice_date': fields.Date.from_string('2014-12-18'),
+            'amount_untaxed': 17.78,
+            'amount_tax': 3.91,
+            'invoice_line_ids': [
+                {
+                    'quantity': 3.0,
+                    'name': 'DESCRIZIONE DELLA FORNITURA',
+                    'price_unit': 11.85,
+                    'discount': 50.0,
+                },
+            ],
+        }], applied_xml)
+
     def test_invoice_user_can_compute_is_self_invoice(self):
         """Ensure that a user having only group_account_invoice can compute field l10n_it_edi_is_self_invoice"""
         user = new_test_user(self.env, login='jag', groups='account.group_account_invoice')
@@ -614,3 +655,82 @@ class TestItEdiImport(TestItEdi):
                 },
             ],
         }], applied_xml)
+
+    def test_decrypt_invoice_from_IAP(self):
+        filename = "IT123456789012_10001.xml"
+        invoice_content = "Invoice content here"
+        invoice_content_bytes = invoice_content.encode()
+        Move = self.env['account.move'].with_company(self.company)
+
+        symm_encrypted_invoice = Fernet(self.symmetric_key).encrypt(invoice_content_bytes)
+
+        result = Move._l10n_it_edi_check_and_decrypt_content(
+            filename=filename,
+            content=base64.b64encode(symm_encrypted_invoice),
+            key=base64.b64encode(self.asymm_encrypted_symmetric_key),
+            proxy_user=self.base_proxy_user,
+        )
+
+        self.assertTrue(result)
+        result_filename, result_content = result
+        self.assertEqual(result_filename, filename)
+        self.assertEqual(result_content, invoice_content_bytes)
+
+    def test_receive_bill_with_attachment(self):
+        """ Test that a bill with embedded attachments saves attachments and the original xml file."""
+        # must build file from scratch in order to check l10n_it_edi_attachment_file
+        filename = 'IT01234567890_FPR02.xml'
+        embedded_files = {
+            'testfile.txt': ('TXT', 'This is a test file.'),
+            'testfile2.txt': ('', 'Test file without FormatoAttachment.'),
+            'testfile3.xml': ('XML', '<hello>How are you?</hello>'),
+        }
+        attachments_data = [
+            f"""
+                <Allegati>
+                    <NomeAttachment>{filename}</NomeAttachment>
+                    <FormatoAttachment>{extension}</FormatoAttachment>
+                    <DescrizioneAttachment>An embedded attachment.</DescrizioneAttachment>
+                    <Attachment>{base64.b64encode(raw.encode()).decode()}</Attachment>
+                </Allegati>
+            """
+            for filename, (extension, raw) in embedded_files.items()
+        ]
+        attachments_str = "\n".join(attachments_data)
+        applied_xml = f'<xpath expr="//FatturaElettronicaBody/DatiGenerali" position="after">{attachments_str}</xpath>'
+
+        tree = self.with_applied_xpath(
+            etree.fromstring(self.fake_test_content),
+            applied_xml
+        )
+        import_content = etree.tostring(tree)
+
+        # import the xml
+        move = self.env['account.move']._l10n_it_edi_process_downloads_attachments(
+            self.company,
+            [{
+                'name': filename,
+                'raw': import_content,
+                'type': 'binary',
+            }])
+
+        # There should be one attachment with this filename, and it should match the original XML.
+        it_edi_attachment = self.env['ir.attachment'].search([
+            ('name', '=', filename),
+            ('res_model', '=', 'account.move'),
+            ('res_field', '=', 'l10n_it_edi_attachment_file'),
+        ])
+        self.assertEqual(len(it_edi_attachment), 1)
+        self.assertEqual(move.l10n_it_edi_attachment_name, 'IT01234567890_FPR02.xml')
+        self.assertEqual(move.l10n_it_edi_attachment_file.decode(), import_content.decode())
+
+        # ensure that the embedded files are imported correctly
+        for filename, (extension, raw) in embedded_files.items():
+            chatter_attachments = self.env['ir.attachment'].search([
+                ('name', '=', filename),
+                ('res_model', '=', 'account.move'),
+                ('res_id', '=', move.id),
+                ('res_field', '=', False),
+            ])
+            self.assertEqual(len(chatter_attachments), 1)
+            self.assertEqual(chatter_attachments.raw.decode(), raw)

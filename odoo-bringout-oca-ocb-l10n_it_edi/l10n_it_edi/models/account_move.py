@@ -1,16 +1,14 @@
-
+import base64
 import logging
 import re
 import uuid
-from base64 import b64encode, b64decode
-from collections import defaultdict
+import unicodedata
 from datetime import datetime
-
 from lxml import etree
 from odoo.addons.base.models.ir_qweb_fields import Markup, nl2br, nl2br_enclose
 from odoo.exceptions import LockError, UserError
 from odoo.fields import Domain
-from odoo.tools import cleanup_xml_node, float_compare, float_is_zero, float_repr, float_round, html2plaintext
+from odoo.tools import BinaryBytes, cleanup_xml_node, float_compare, float_is_zero, float_repr, float_round, html2plaintext
 from odoo.tools.sql import column_exists, create_column
 
 from odoo import _, api, Command, fields, models, modules
@@ -46,11 +44,10 @@ def get_date(tree, xpath):
 
 def get_datetime(tree, xpath):
     """ Datetimes in FatturaPA are ISO 8601 date format, pattern '[-]CCYY-MM-DDThh:mm:ss[Z|(+|-)hh:mm]'
-        Python 3.7 -> 3.11 doesn't support 'Z'.
     """
     if datetime_str := get_text(tree, xpath):
         try:
-            return datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
+            return datetime.fromisoformat(datetime_str)
         except (ValueError, TypeError):
             return False
     return False
@@ -74,6 +71,7 @@ class AccountMove(models.Model):
             ('accepted_by_pa_partner_after_expiry', 'SdI Accepted, PA Partner Expired Terms'),
         ],
         copy=False, tracking=True,
+        inverse="_inverse_l10n_it_edi_state",
         help="This state is updated by default, but you can force the value. ",
     )
     l10n_it_edi_header = fields.Html(
@@ -110,6 +108,9 @@ class AccountMove(models.Model):
         help="Public Investment Unique Identifier")
     # Technical field for showing the above fields or not
     l10n_it_partner_pa = fields.Boolean(compute='_compute_l10n_it_partner_pa')
+    l10n_it_partner_is_public_administration = fields.Boolean(compute='_compute_l10n_it_partner_is_public_administration',
+        help='Only partners that have a 6-chars long l10n_it_pa_index actually belong to the Public Administration'
+    )
 
     l10n_it_payment_method = fields.Selection(
         selection=L10N_IT_PAYMENT_METHOD_SELECTION,
@@ -124,6 +125,12 @@ class AccountMove(models.Model):
         store=True,
         readonly=False,
         copy=False,
+    )
+
+    l10n_it_convention_code = fields.Char(
+        string="Order/Convention Code",
+        size=100,
+        help=" Used to connect an individual invoice to a broader framework agreement, a specific project, or a long-term convention."
     )
 
     def _auto_init(self):
@@ -181,6 +188,12 @@ class AccountMove(models.Model):
         for move in self:
             partner = move.commercial_partner_id
             move.l10n_it_partner_pa = partner and (partner._l10n_it_edi_is_public_administration() or len(partner.l10n_it_pa_index or '') == 7)
+
+    @api.depends('commercial_partner_id.l10n_it_pa_index', 'company_id')
+    def _compute_l10n_it_partner_is_public_administration(self):
+        for move in self:
+            partner = move.commercial_partner_id
+            move.l10n_it_partner_is_public_administration = partner and partner._l10n_it_edi_is_public_administration()
 
     @api.depends('country_code', 'l10n_it_edi_proxy_mode')
     def _compute_l10n_it_edi_button_label(self):
@@ -283,9 +296,11 @@ class AccountMove(models.Model):
         is_xml = (
             file_data['name'].endswith('.xml')
             or file_data['mimetype'].endswith('/xml')
-            or 'text/plain' in file_data['mimetype']
-            and file_data['raw']
-            and file_data['raw'].startswith(b'<?xml'))
+            or (
+                'text/plain' in file_data['mimetype']
+                and file_data['raw'].startswith(b'<?xml')
+            )
+        )
         is_p7m = file_data['mimetype'] == 'application/pkcs7-mime'
         return (is_xml or is_p7m) and re.search(FATTURAPA_FILENAME_RE, file_data['name'])
 
@@ -325,6 +340,11 @@ class AccountMove(models.Model):
         # EXTENDS 'account'
         self.with_context(skip_is_manually_modified=True).write({'l10n_it_edi_header': False})
         return super()._post(soft)
+
+    def _inverse_l10n_it_edi_state(self):
+        for move in self:
+            if move.is_move_sent and move.l10n_it_edi_state in ('rejected', 'rejected_by_pa_partner'):
+                move.is_move_sent = False
 
     def _get_fields_to_detach(self):
         # EXTENDS account
@@ -371,7 +391,7 @@ class AccountMove(models.Model):
             }
 
         attachment_vals = self._l10n_it_edi_get_attachment_values(pdf_values=None)
-        self.l10n_it_edi_attachment_file = b64encode(attachment_vals['raw'])
+        self.l10n_it_edi_attachment_file = BinaryBytes(attachment_vals['raw'])
         self.l10n_it_edi_attachment_name = attachment_vals['name']
         self.invalidate_recordset(fnames=['l10n_it_edi_attachment_name', 'l10n_it_edi_attachment_file'])
         self.message_post(attachments=[(self.l10n_it_edi_attachment_name, attachment_vals['raw'])])
@@ -380,7 +400,13 @@ class AccountMove(models.Model):
 
     def action_check_l10n_it_edi(self):
         self.ensure_one()
-        if not self.l10n_it_edi_transaction and self.l10n_it_edi_state not in WAITING_STATES:
+        if (
+            not self.l10n_it_edi_transaction
+            and self.l10n_it_edi_state not in WAITING_STATES
+        ) or (
+            self.l10n_it_edi_state == 'forwarded'
+            and not self.l10n_it_partner_is_public_administration
+        ):
             raise UserError(_("This move is not waiting for updates from the SdI."))
         if self.l10n_it_edi_state == 'being_sent':
             return {'type': 'ir.actions.client', 'tag': 'reload'}
@@ -396,12 +422,12 @@ class AccountMove(models.Model):
         # EXTENDS 'account'
         self.ensure_one()
         if filetype == 'fatturapa':
-            if fatturapa_attachment := self.l10n_it_edi_attachment_file:
-                return {
+            if (fatturapa_attachment := self.l10n_it_edi_attachment_file) and self.l10n_it_edi_attachment_name:
+                return [{
                     'filename': self.l10n_it_edi_attachment_name,
                     'filetype': 'xml',
-                    'content': b64decode(fatturapa_attachment),
-                }
+                    'content': fatturapa_attachment,
+                }]
         return super()._get_invoice_legal_documents(filetype, allow_fallback=allow_fallback)
 
     def get_extra_print_items(self):
@@ -904,6 +930,7 @@ class AccountMove(models.Model):
             'origin_document_date': self.l10n_it_origin_document_date,
             'cig': self.l10n_it_cig,
             'cup': self.l10n_it_cup,
+            'convention_code': self.l10n_it_convention_code,
             'currency': self.currency_id or self.company_currency_id if not convert_to_euros else self.env.ref('base.EUR'),
             'regime_fiscale': company.l10n_it_tax_system if not is_self_invoice else 'RF18',
             'is_self_invoice': is_self_invoice,
@@ -917,7 +944,7 @@ class AccountMove(models.Model):
             'balance_multiplicator': -1 if self.is_inbound() else 1,
             'abs': abs,
             'pdf_name': pdf_values['name'] if pdf_values else False,
-            'pdf': b64encode(pdf_values['raw']).decode() if pdf_values else False,
+            'pdf': base64.b64encode(pdf_values['raw']).decode() if pdf_values else False,
             'withholding_values': withholding_values,
             'pension_fund_values': pension_fund_values,
         }
@@ -1158,7 +1185,15 @@ class AccountMove(models.Model):
                 moves_to_check = self.search([
                     ('company_id', '=', proxy_user.company_id.id),
                     ('l10n_it_edi_transaction', '!=', False),
-                    ('l10n_it_edi_state', 'in', WAITING_STATES)
+                    *Domain.OR(
+                        [[('l10n_it_edi_state', 'in', WAITING_STATES)],
+                        Domain.AND(
+                            [
+                                [('l10n_it_edi_state', '=', 'forwarded')],
+                                [('commercial_partner_id.l10n_it_pa_index', '=ilike', '_' * 6)],
+                            ]
+                        )]
+                    )
                 ])
                 if moves_to_check:
                     moves_to_check._l10n_it_edi_update_send_state()
@@ -1178,8 +1213,7 @@ class AccountMove(models.Model):
         # Download invoices
         invoices_data = {}
         try:
-            invoices_data = proxy_user._make_request(f'{server_url}/api/l10n_it_edi/1/in/RicezioneInvoice',
-                params={'recipient_codice_fiscale': proxy_user.company_id.l10n_it_codice_fiscale})
+            invoices_data = proxy_user._make_request(f'{server_url}/api/l10n_it_edi/1/in/RicezioneInvoice')
         except AccountEdiProxyError as e:
             _logger.error('Error while receiving invoices from the SdI: %s', e)
             return False
@@ -1232,28 +1266,7 @@ class AccountMove(models.Model):
             proxy_acks.append(id_transaction)
 
         if attachment_vals:
-            attachments = self.env['ir.attachment'].with_company(proxy_user.company_id).create(attachment_vals)
-
-            # Unwrap the attachments. Potentially each FatturaPA file can get unwrapped into several sub-attachments that
-            # should each create one invoice.
-            files_data = self._to_files_data(attachments)
-            files_data.extend(self._unwrap_attachments(files_data))
-
-            moves = self.with_company(proxy_user.company_id).create([{}] * len(files_data))
-
-            for move, file_data in zip(moves, files_data):
-                attachment = file_data['attachment']
-                attachment.write({'res_model': 'account.move', 'res_id': move.id, 'res_field': 'l10n_it_edi_attachment_file'})
-
-                # Post the attachment in the chatter
-                move.message_post(
-                    body=_("This invoice was retrieved from the SdI."),
-                    attachment_ids=attachment.ids
-                )
-
-            # Extend created moves with the related attachments.
-            for move, file_data in zip(moves, files_data):
-                move._extend_with_attachments([file_data], new=True)
+            self._l10n_it_edi_process_downloads_attachments(proxy_user.company_id, attachment_vals)
 
         return {"retrigger": retrigger, "proxy_acks": proxy_acks}
 
@@ -1286,6 +1299,54 @@ class AccountMove(models.Model):
             return False
 
         return filename, decrypted_content
+
+    def _l10n_it_edi_process_downloads_attachments(self, company_id, attachment_vals):
+        """ Create invoices from attachments, ensuring that all required fields are
+            written to.
+
+            Returns the moves created from the attachment_vals.
+        """
+        Attachment = self.env['ir.attachment'].with_company(company_id)
+        for attachment_val in attachment_vals:
+            attachment_val['mimetype'] = Attachment._compute_mimetype(attachment_val)
+
+        attachments = Attachment.union(Attachment.new(val) for val in attachment_vals)
+
+        # Unwrap the attachments. Potentially each FatturaPA file can get unwrapped into
+        # several sub-attachments that should each create one invoice.
+        files_data = self._to_files_data(attachments)
+        files_data.extend(self._unwrap_attachments(files_data))
+
+        moves = self.with_company(company_id).create([{
+                'l10n_it_edi_attachment_file': BinaryBytes(file_data['raw']),
+                'l10n_it_edi_attachment_name': file_data['name'],
+            } for file_data in files_data
+        ])
+        attachments_map = dict(Attachment._read_group(
+            domain=[
+                ('res_model', '=', 'account.move'),
+                ('res_field', '=', 'l10n_it_edi_attachment_file'),
+                ('res_id', 'in', moves.ids),
+            ],
+            groupby=['res_id'],
+            aggregates=['id:array_agg'],
+        ))
+
+        # Extend created moves with the related attachments.
+        for move, file_data in zip(moves, files_data):
+            attachment_ids = attachments_map.get(move.id)
+            Attachment.browse(attachment_ids).name = move.l10n_it_edi_attachment_name
+
+            # Post the attachment in the chatter
+            move.message_post(
+                body=_("This invoice was retrieved from the SdI."),
+                attachment_ids=attachment_ids
+            )
+            move._extend_with_attachments([file_data], new=True)
+
+        attachments.unlink()
+
+        return moves
 
     def _l10n_it_edi_search_partner(self, company, vat, codice_fiscale, email, destination_code=None):
         base_domain = self.env['res.partner']._check_company_domain(company)
@@ -1351,19 +1412,34 @@ class AccountMove(models.Model):
                 importo_ritenuta = get_float(withholding, './/ImportoRitenuta')
                 withholding_percentage = -float_round((importo_ritenuta / prezzo_totale) * 100, 1)
 
-            withholding_tax = self._l10n_it_edi_search_tax_for_import(
-                company,
-                withholding_percentage,
-                ([('l10n_it_withholding_type', '=', withholding_type),
-                  ('l10n_it_withholding_reason', '=', withholding_reason)]
-                 + type_tax_use_domain))
-            if withholding_tax:
-                withholding_taxes.append(withholding_tax)
+            # Some bills involving ENASARCO come in with a wrong withholding_reason
+            # so we defend ourselves by searching with exact type and reason first,
+            # then with just the type
+            for extra_domain, message in ([(
+                [
+                    ('l10n_it_withholding_type', '=', withholding_type),
+                    ('l10n_it_withholding_reason', '=', withholding_reason),
+                    *type_tax_use_domain
+                ],
+                None
+            ), (
+                [
+                    ('l10n_it_withholding_type', '=', withholding_type),
+                    *type_tax_use_domain
+                ],
+                _("ENASARCO tax (type %(wtype)s) has wrong reason %(reason)s",
+                  wtype=withholding_type, reason=withholding_reason))
+            ]):
+                if withholding_tax := self._l10n_it_edi_search_tax_for_import(
+                    company, withholding_percentage, extra_domain,
+                ):
+                    withholding_taxes.append(withholding_tax)
+                    break
             else:
-                message_to_log.append(Markup("%s<br/>%s") % (
-                    _("Withholding tax not found"),
-                    self.env['account.move']._compose_info_message(body_tree, '.'),
-                ))
+                message = _("Withholding tax not found")
+            if message:
+                message_to_log.append(Markup("%s<br/>%s") % (message, self._compose_info_message(body_tree, '.')))
+
         extra_info["withholding_taxes"] = withholding_taxes
 
         pension_fund_elements = body_tree.xpath('.//DatiGeneraliDocumento/DatiCassaPrevidenziale')
@@ -1381,7 +1457,10 @@ class AccountMove(models.Model):
                 ([('l10n_it_pension_fund_type', '=', pension_fund_type)]
                  + type_tax_use_domain))
             if pension_fund_tax:
-                pension_fund_taxes[vat_tax_factor_percent] = pension_fund_tax
+                if vat_tax_factor_percent not in pension_fund_taxes:
+                    pension_fund_taxes[vat_tax_factor_percent] = pension_fund_tax
+                else:
+                    pension_fund_taxes[vat_tax_factor_percent] |= pension_fund_tax
             else:
                 message_to_log.append(Markup("%s<br/>%s") % (
                     _("Pension Fund tax not found"),
@@ -1552,13 +1631,13 @@ class AccountMove(models.Model):
                 if acc_number := get_text(tree, './/DatiPagamento/DettaglioPagamento/IBAN'):
                     if self.partner_id and self.partner_id.commercial_partner_id:
                         bank = self.env['res.partner.bank'].search([
-                            ('acc_number', '=', acc_number),
+                            ('account_number', '=', acc_number),
                             ('partner_id', '=', self.partner_id.commercial_partner_id.id),
                             ('company_id', 'in', [self.company_id.id, False])
                         ], order='company_id', limit=1)
                     else:
                         bank = self.env['res.partner.bank'].search([
-                            ('acc_number', '=', acc_number),
+                            ('account_number', '=', acc_number),
                             ('company_id', 'in', [self.company_id.id, False])
                         ], order='company_id', limit=1)
                     if bank:
@@ -1593,14 +1672,18 @@ class AccountMove(models.Model):
                 if move_line:
                     message_to_log += self._l10n_it_edi_import_line(element, move_line, extra_info)
 
+            attachment_vals = []
             for element in tree.xpath('.//Allegati'):
                 raw_name = get_text(element, './/NomeAttachment') or ''
                 raw_ext = get_text(element, './/FormatoAttachment') or ''
-                self.l10n_it_edi_attachment_name = f"{raw_name}.{raw_ext}" if raw_ext else raw_name
-                self.l10n_it_edi_attachment_file = get_text(element, './/Attachment')
+                attachment_vals.append((
+                    f"{raw_name}.{raw_ext}" if raw_ext and not raw_name.casefold().endswith(raw_ext.casefold()) else raw_name,
+                    BinaryBytes(base64.b64decode(get_text(element, './/Attachment'))),
+                ))
+            if attachment_vals:
                 self.sudo().message_post(
-                    body=(_("Attachment from XML")),
-                    attachments=[(self.l10n_it_edi_attachment_name, b64decode(self.l10n_it_edi_attachment_file))],
+                    body=(_("Attachments from XML")),
+                    attachments=attachment_vals,
                 )
 
             global_enasarco_lines = []
@@ -1712,6 +1795,7 @@ class AccountMove(models.Model):
                     if get_float(riepilogo, './/AliquotaIVA') == percentage and (imponibile := get_float(riepilogo, './/ImponibileImporto')):
                         percentage = -float_round(23.0 * (imponibile / prezzo_totale), 1)
                         break
+
         elif amount := get_float(element, './/Importo'):
             percentage = get_float(element, './/Aliquota')
             if not percentage and (tax_amount := get_float(element, './/Imposta')):
@@ -1969,6 +2053,13 @@ class AccountMove(models.Model):
             sep = ' ' if street and street2 else ''
             return format_alphanumeric(f"{street}{sep}{street2}", maxlen)
 
+        def format_uom(uom, maxlen=None):
+            if not uom:
+                return False
+
+            uom = unicodedata.normalize('NFKC', uom)
+            return format_alphanumeric(uom, maxlen)
+
         return {
             'format_date': format_date,
             'format_float': format_float,
@@ -1978,6 +2069,7 @@ class AccountMove(models.Model):
             'format_phone': format_phone,
             'format_alphanumeric': format_alphanumeric,
             'format_address': format_address,
+            'format_uom': format_uom,
         }
 
     def _l10n_it_edi_render_xml(self, pdf_values=None):
@@ -2049,7 +2141,7 @@ class AccountMove(models.Model):
             move.l10n_it_edi_header = False
             attachment = attachments_vals[move]
             filename = attachment['name']
-            content = b64encode(attachment['raw']).decode()
+            content = base64.b64encode(attachment['raw']).decode()
 
             try:
                 response = move._l10n_it_edi_upload([{
@@ -2197,7 +2289,8 @@ class AccountMove(models.Model):
             return {'sdi_state': sdi_state}
 
         decrypted_update_content = etree.fromstring(xml_content)
-        outcome = get_text(decrypted_update_content, './/Esito')
+        outcome = get_text(decrypted_update_content, './/EsitoCommittente/Esito')
+        outcome_description = get_text(decrypted_update_content, './/EsitoCommittente/Descrizione')
         date_arrival = get_datetime(decrypted_update_content, './/DataOraRicezione') or fields.Date.today()
         errors = [(
             get_text(error_element, '//Codice'),
@@ -2209,6 +2302,7 @@ class AccountMove(models.Model):
             'sdi_state': sdi_state,
             'errors': errors,
             'outcome': outcome,
+            'outcome_description': outcome_description,
             'date': date_arrival,
             'filename': filename,
         }
@@ -2324,8 +2418,9 @@ class AccountMove(models.Model):
                     "The e-invoice file %(file)s has been refused by %(partner)s (Public Administration).\n"
                     "You have 5 days from now to issue a full refund for this invoice, "
                     "then contact the PA partner to create a new one according to their "
-                    "requests and submit it.",
-                    file=filename, partner=partner_name)),
+                    "requests and submit it.\n%(outcome_description)s",
+                    file=filename, partner=partner_name,
+                    outcome_description=transformed_notification.get('outcome_description', ''))),
                 'accepted_by_pa_partner': _(
                     "The e-invoice file %(file)s has been accepted by %(partner)s (Public Administration), a payment will be issued soon",
                     file=filename, partner=partner_name),
@@ -2368,10 +2463,19 @@ class AccountMove(models.Model):
         """
         pension_fund_map = extra_info.get('pension_fund_taxes', {})
         tax_rate = get_float(element, './/AliquotaIVA')
-        if not tax_rate:
+        l10n_it_exemption_reason = get_text(element, "Natura")
+
+        if not tax_rate and not l10n_it_exemption_reason:
             return None
 
-        pension_fund_tax = pension_fund_map.get(tax_rate)
+        pension_fund_tax_candidates = pension_fund_map.get(tax_rate)
+        if not pension_fund_tax_candidates:
+            return None
+
+        if l10n_it_exemption_reason and len(pension_fund_tax_candidates) > 1:
+            pension_fund_tax_candidates = pension_fund_tax_candidates.filtered(lambda t: t.l10n_it_exempt_reason == l10n_it_exemption_reason)
+        pension_fund_tax = pension_fund_tax_candidates[:1]
+
         if not pension_fund_tax:
             return None
 

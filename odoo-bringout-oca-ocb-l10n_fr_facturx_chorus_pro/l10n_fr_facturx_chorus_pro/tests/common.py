@@ -3,6 +3,7 @@ from odoo.addons.account_edi_ubl_cii.models.account_edi_xml_ubl_bis3 import CHOR
 
 
 class TestUblCiiCommonChorusPro(TestUblCiiCommon):
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -16,7 +17,7 @@ class TestUblCiiCommonChorusPro(TestUblCiiCommon):
             'name': "Chorus Pro - Commune de Nantes",
             # Commune de Nantes
             'vat': "FR74214401093",
-            'company_registry': "21440109300015",
+            'additional_identifiers': {'FR_SIRET': '21440109300015'},
             # Peppol ID for the AIFE (= Chorus Pro)
             'peppol_eas': chorus_eas,
             'peppol_endpoint': chorus_endpoint,

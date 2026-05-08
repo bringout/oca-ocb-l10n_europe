@@ -1,5 +1,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 from unittest import SkipTest
+from lxml import etree
 from odoo import Command
 from odoo.tests import freeze_time, tagged
 from odoo.addons.l10n_it_edi.tests.common import TestItEdi
@@ -21,26 +22,22 @@ class TestItEdiExport(TestItEdi):
             'street': 'Via Test PA',
             'zip': '32121',
             'city': 'PA Town',
-            'is_company': True
         })
 
         cls.italian_partner_no_address_codice = cls.env['res.partner'].create({
             'name': 'Alessi',
             'l10n_it_codice_fiscale': '00465840031',
-            'is_company': True,
         })
 
         cls.italian_partner_no_address_VAT = cls.env['res.partner'].create({
             'name': 'Alessi',
             'vat': 'IT00465840031',
-            'is_company': True,
         })
 
         cls.american_partner = cls.env['res.partner'].create({
             'name': 'Alessi',
             'vat': '00465840031',
             'country_id': cls.env.ref('base.us').id,
-            'is_company': True,
         })
 
     def test_vat_not_equals_codice(self):
@@ -384,14 +381,14 @@ class TestItEdiExport(TestItEdi):
             'country_id': self.env.ref('base.us').id,
             'zip': '12345',
             'street': '123 Rainbow Road',
-            'is_company': True,
+            'vat': 'OO99999999999',
         })
 
         # =============== create invoices ===============
         usd = self.env.ref('base.USD')
 
         self.env['res.currency.rate'].create({
-            'name': '2024-08-06',
+            'name': '2024-08-05',
             'rate': 1.0789,
             'currency_id': usd.id,
             'company_id': self.company.id,
@@ -470,8 +467,7 @@ class TestItEdiExport(TestItEdi):
 
     @freeze_time("2025-02-03")
     def test_export_invoice_with_two_downpayments(self):
-        if self.env['ir.module.module']._get('sale').state != 'installed':
-            self.skipTest("sale module is not installed")
+        self.ensure_installed('sale')
 
         sale_order = self.env['sale.order'].with_company(self.company).sudo().create({
             'partner_id': self.italian_partner_a.id,
@@ -531,7 +527,6 @@ class TestItEdiExport(TestItEdi):
             'name': 'Alessi',
             'l10n_it_codice_fiscale': 'Mrtmtt91d08f205j',
             'l10n_it_pa_index': 'N8mimm9',
-            'is_company': False,
         })
 
         invoice = self.env['account.move'].with_company(self.company).create({
@@ -656,6 +651,26 @@ class TestItEdiExport(TestItEdi):
         (invoice_b.line_ids + credit_note.line_ids).filtered(lambda line: line.account_type in ('asset_receivable')).reconcile()
         self._assert_export_invoice(credit_note, 'invoice_exclude_postdated_moves.xml')
 
+    def test_export_attachment(self):
+        invoice_a = self.env['account.move'].with_company(self.company).create({
+            'move_type': 'out_invoice',
+            'invoice_date': '2022-03-24',
+            'invoice_date_due': '2022-03-24',
+            'partner_id': self.italian_partner_a.id,
+            'invoice_line_ids': [
+                Command.create({
+                    'name': "Product A",
+                    'price_unit': 800.40,
+                    'tax_ids': [Command.set(self.default_tax.ids)],
+                })
+            ],
+        })
+        invoice_a.action_post()
+        self._assert_export_invoice(invoice_a, 'invoice_with_attachment.xml', pdf_values={
+            'name': 'hello.pdf',
+            'raw': b'hello darkness my old friend',
+        })
+
     def test_export_XML_oss_tax(self):
         be_partner = self.env['res.partner'].create({
             'name': 'Alessi',
@@ -697,3 +712,19 @@ class TestItEdiExport(TestItEdi):
         })
         invoice.action_post()
         self._assert_export_invoice(invoice, 'invoice_with_oss_tax.xml')
+
+    def test_export_invoice_uom_unicode_normalization(self):
+        """Test that non-standard Unicode characters (e.g. m², m³) are correctly normalized for XML invoices."""
+
+        self.product_a.uom_id = self.product_a.uom_id.copy({'name': 'm²'})
+        invoice = self._create_invoice(
+            partner_id=self.italian_partner_a,
+            post=True,
+            invoice_line_ids=[self._prepare_invoice_line(product_id=self.product_a, price_unit=800.40)],
+        )
+
+        xml = invoice._l10n_it_edi_render_xml()
+        invoice_tree = etree.fromstring(xml)
+
+        uom_nodes = invoice_tree.xpath("//*[local-name()='DettaglioLinee']/*[local-name()='UnitaMisura']")
+        self.assertEqual(uom_nodes[0].text, 'm2')

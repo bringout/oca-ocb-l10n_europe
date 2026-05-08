@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 # Thanks to AEOdoo and the Spanish community
@@ -28,10 +27,10 @@ You need to configure your certificate and the tax agency.
     'depends': [
         'certificate',
         'l10n_es',
-        'account_edi',
     ],
     'data': [
-        'data/account_edi_data.xml',
+        'security/ir.model.access.csv',
+        'security/ir_rule.xml',
 
         'views/account_move_views.xml',
         'views/l10n_es_edi_sii_certificate_views.xml',

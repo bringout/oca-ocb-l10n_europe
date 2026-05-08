@@ -10,8 +10,6 @@ class AccountChartTemplate(models.AbstractModel):
     def _get_gt_template_data(self):
         return {
             'code_digits': '9',
-            'property_account_receivable_id': 'cta110201',
-            'property_account_payable_id': 'cta210101',
         }
 
     @template('gt', 'res.company')
@@ -29,7 +27,8 @@ class AccountChartTemplate(models.AbstractModel):
                 'account_purchase_tax_id': 'impuestos_plantilla_iva_por_cobrar',
                 'income_account_id': 'cta410101',
                 'expense_account_id': 'cta510101',
-                'account_stock_journal_id': 'inventory_valuation',
+                'receivable_account_id': 'cta110201',
+                'payable_account_id': 'cta210101',
                 'account_stock_valuation_id': 'cta140101',
             },
         }
@@ -37,6 +36,14 @@ class AccountChartTemplate(models.AbstractModel):
     @template('gt', 'account.account')
     def _get_gt_account_account(self):
         return {
+            'cta120102': {'asset_depreciation_account_id': 'cta120201', 'asset_expense_account_id': 'cta680101'},
+            'cta120104': {'asset_depreciation_account_id': 'cta120201', 'asset_expense_account_id': 'cta680101'},
+            'cta120105': {'asset_depreciation_account_id': 'cta120201', 'asset_expense_account_id': 'cta680101'},
+            'cta120106': {'asset_depreciation_account_id': 'cta120201', 'asset_expense_account_id': 'cta680101'},
+            'cta120107': {'asset_depreciation_account_id': 'cta120201', 'asset_expense_account_id': 'cta680101'},
+            'cta120108': {'asset_depreciation_account_id': 'cta120201', 'asset_expense_account_id': 'cta680101'},
+            'cta120109': {'asset_depreciation_account_id': 'cta120201', 'asset_expense_account_id': 'cta680101'},
+            'cta120110': {'asset_depreciation_account_id': 'cta120201', 'asset_expense_account_id': 'cta680101'},
             'cta140101': {
                 'account_stock_expense_id': 'cta510101',
                 'account_stock_variation_id': 'cta640101',

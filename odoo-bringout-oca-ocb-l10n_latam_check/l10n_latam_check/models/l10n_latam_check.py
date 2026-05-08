@@ -35,10 +35,6 @@ class L10n_LatamCheck(models.Model):
         compute='_compute_current_journal', store=True,
     )
     name = fields.Char(string='Number')
-    bank_id = fields.Many2one(
-        comodel_name='res.bank',
-        compute='_compute_bank_id', store=True, readonly=False,
-    )
     issuer_vat = fields.Char(
         compute='_compute_issuer_vat', store=True, readonly=False,
     )
@@ -60,6 +56,7 @@ class L10n_LatamCheck(models.Model):
         related='payment_id.payment_method_line_id',
         store=True,
     )
+    bank_account_id = fields.Many2one('res.partner.bank', compute='_compute_bank_account_id', store=True, readonly=False)
 
     # issue_state is used to know that is an own check and also that is posted
     _unique = models.UniqueIndex("(name, payment_method_line_id) WHERE outstanding_line_id IS NOT NULL")
@@ -100,7 +97,7 @@ class L10n_LatamCheck(models.Model):
     @api.depends('outstanding_line_id.amount_residual')
     def _compute_issue_state(self):
         for rec in self:
-            if not rec.outstanding_line_id:
+            if rec.payment_method_code != 'own_checks' or not rec.outstanding_line_id:
                 rec.issue_state = False
             elif rec.amount and not rec.outstanding_line_id.amount_residual:
                 if any(
@@ -113,11 +110,29 @@ class L10n_LatamCheck(models.Model):
             else:
                 rec.issue_state = 'handed'
 
+    @api.depends('payment_method_line_id.code', 'partner_id')
+    def _compute_bank_account_id(self):
+        for rec in self:
+            rec.bank_account_id = False
+            if rec.payment_method_line_id.code == 'new_third_party_checks':
+                rec.bank_account_id = rec.partner_id.bank_ids[:1].id
+
     def action_void(self):
         for rec in self.filtered('outstanding_line_id'):
+            # Unreconcile the payment from its mactched invoice before voiding
+            payment_line = rec.payment_id.move_id.line_ids.filtered(
+                lambda l: l.account_id.account_type in ('asset_receivable', 'liability_payable')
+            )
+            if payment_line:
+                payment_line.remove_move_reconcile()
+
+            # Create and post reversal move to cancel original payment entry
             void_move = rec.env['account.move'].create(rec._prepare_void_move_vals())
             void_move.action_post()
+
+            # Reconcile the void move with the check and the outstanding debit on invoice
             (void_move.line_ids[1] + rec.outstanding_line_id).reconcile()
+            (void_move.line_ids[0] + payment_line).reconcile()
 
     def _get_last_operation(self):
         self.ensure_one()
@@ -177,13 +192,6 @@ class L10n_LatamCheck(models.Model):
         min_amount_error = self.filtered(lambda x: x.amount <= 0)
         if min_amount_error:
             raise ValidationError(_('The amount of the check must be greater than 0'))
-
-    @api.depends('payment_method_line_id.code', 'payment_id.partner_id')
-    def _compute_bank_id(self):
-        new_third_party_checks = self.filtered(lambda x: x.payment_method_line_id.code == 'new_third_party_checks')
-        for rec in new_third_party_checks:
-            rec.bank_id = rec.partner_id.bank_ids[:1].bank_id
-        (self - new_third_party_checks).bank_id = False
 
     @api.depends('payment_method_line_id.code', 'payment_id.partner_id')
     def _compute_issuer_vat(self):

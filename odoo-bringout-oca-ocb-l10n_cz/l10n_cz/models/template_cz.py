@@ -1,5 +1,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-from odoo import api, models
+from odoo import models
+
 from odoo.addons.account.models.chart_template import template
 
 
@@ -10,10 +11,6 @@ class AccountChartTemplate(models.AbstractModel):
     def _get_cz_template_data(self):
         return {
             'code_digits': '6',
-            'use_storno_accounting': True,
-            'property_account_receivable_id': 'chart_cz_311000',
-            'property_account_payable_id': 'chart_cz_321000',
-            'property_stock_valuation_account_id': 'chart_cz_132000',
         }
 
     @template('cz', 'res.company')
@@ -34,15 +31,16 @@ class AccountChartTemplate(models.AbstractModel):
                 'account_purchase_tax_id': 'l10n_cz_21_receipt_domestic_supplies',
                 'expense_account_id': 'chart_cz_504000',
                 'income_account_id': 'chart_cz_604000',
-                'account_stock_journal_id': 'inventory_valuation',
+                'receivable_account_id': 'chart_cz_311000',
+                'payable_account_id': 'chart_cz_321000',
                 'account_stock_valuation_id': 'chart_cz_131000',
             },
         }
 
-    @api.model
-    def _get_demo_data_move(self, company=False):
-        data = super()._get_demo_data_move(company)
-        if company and company.account_fiscal_country_id.code == 'CZ':
+    @template(model='account.move', demo=True)
+    def _get_demo_data_move(self, template_code):
+        data = super()._get_demo_data_move(template_code)
+        if template_code == 'cz':
             for key in (
                 'demo_invoice_1',
                 'demo_invoice_2',

@@ -1,13 +1,13 @@
+import base64
 import gzip
 import json
 import re
-import base64
 from datetime import datetime
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import requests
 from lxml import etree
-from pytz import timezone
 from requests.exceptions import RequestException
 
 from odoo import _, api, fields, models, release
@@ -20,7 +20,7 @@ from odoo.addons.l10n_es_edi_tbai.models.xml_utils import (
     cleanup_xml_signature,
 )
 from odoo.exceptions import UserError
-from odoo.tools import get_lang
+from odoo.tools import BinaryBytes, get_lang
 from odoo.tools.float_utils import float_repr, float_round
 from odoo.tools.xml_utils import cleanup_xml_node
 
@@ -112,7 +112,7 @@ class L10n_Es_Edi_TbaiDocument(models.Model):
         if not self.company_id.vat:
             return _("Please configure the Tax ID on your company for TicketBAI.")
 
-        if self.company_id.l10n_es_tbai_tax_agency == 'bizkaia' and self.company_id._l10n_es_freelancer() and not self.env['ir.config_parameter'].sudo().get_param('l10n_es_edi_tbai.epigrafe', False):
+        if self.company_id.l10n_es_tbai_tax_agency == 'bizkaia' and self.company_id._l10n_es_freelancer() and not self.env['ir.config_parameter'].sudo().get_str('l10n_es_edi_tbai.epigrafe'):
             return _("In order to use Ticketbai Batuz for freelancers, you will need to configure the "
                         "Epigrafe or Main Activity.  In this version, you need to go in debug mode to "
                         "Settings > Technical > System Parameters and set the parameter 'l10n_es_edi_tbai.epigrafe'"
@@ -265,7 +265,7 @@ class L10n_Es_Edi_TbaiDocument(models.Model):
             xml_to_send = self._generate_final_xml_bi(freelancer=freelancer)
             lroe_str = etree.tostring(xml_to_send)
         else:
-            lroe_str = self.xml_attachment_id.raw
+            lroe_str = self.xml_attachment_id.raw.content
 
         lroe_bytes = gzip.compress(lroe_str)
 
@@ -304,7 +304,7 @@ class L10n_Es_Edi_TbaiDocument(models.Model):
             'sender_vat': sender.vat[2:] if sender.vat.startswith('ES') else sender.vat,
             'fiscal_year': str(self.date.year),
             'freelancer': freelancer,
-            'epigrafe': self.env['ir.config_parameter'].sudo().get_param('l10n_es_edi_tbai.epigrafe', '')
+            'epigrafe': self.env['ir.config_parameter'].sudo().get_str('l10n_es_edi_tbai.epigrafe')
         }
         lroe_values.update({'tbai_b64_list': [base64.b64encode(self.xml_attachment_id.raw).decode()]})
         lroe_str = self.env['ir.qweb']._render('l10n_es_edi_tbai.template_LROE_240_main', lroe_values)
@@ -349,7 +349,7 @@ class L10n_Es_Edi_TbaiDocument(models.Model):
             **self._get_header_values(),
             **self._get_sender_values(),
             **(self._get_recipient_values(values['partner'], values["is_simplified"]) if values['partner'] and not self.is_cancel or not values['is_sale'] else {}),
-            'datetime_now': datetime.now(tz=timezone('Europe/Madrid')),
+            'datetime_now': datetime.now(tz=ZoneInfo('Europe/Madrid')),
             'format_date': lambda d: datetime.strftime(d, '%d-%m-%Y'),
             'format_time': lambda d: datetime.strftime(d, '%H:%M:%S'),
             'format_float': format_float,
@@ -710,7 +710,7 @@ class L10n_Es_Edi_TbaiDocument(models.Model):
         values = {
             'dsig': {
                 'document_id': document_id,
-                'x509_certificate': base64.encodebytes(base64.b64decode(certificate_sudo._get_der_certificate_bytes())).decode(),
+                'x509_certificate': BinaryBytes(base64.b64decode(certificate_sudo._get_der_certificate_bytes())),
                 'public_modulus': n.decode(),
                 'public_exponent': e.decode(),
                 'iso_now': datetime.now().isoformat(),
@@ -720,7 +720,7 @@ class L10n_Es_Edi_TbaiDocument(models.Model):
                 'reference_uri': "Reference-" + document_id,
                 'sigpolicy_url': get_key(company.l10n_es_tbai_tax_agency, 'sigpolicy_url'),
                 'sigpolicy_digest': get_key(company.l10n_es_tbai_tax_agency, 'sigpolicy_digest'),
-                'sigcertif_digest': certificate_sudo._get_fingerprint_bytes(formatting='base64').decode(),
+                'sigcertif_digest': BinaryBytes(certificate_sudo._get_fingerprint_bytes(formatting='raw')),
                 'x509_issuer_description': issuer,
                 'x509_serial_number': int(certificate_sudo.serial_number),
             }
@@ -747,7 +747,7 @@ class L10n_Es_Edi_TbaiDocument(models.Model):
             'sender': sender,
             'sender_vat': sender.vat[2:] if sender.vat.startswith('ES') else sender.vat,
             'fiscal_year': str(self.date.year),
-            'epigrafe': self.env['ir.config_parameter'].sudo().get_param('l10n_es_edi_tbai.epigrafe', ''),
+            'epigrafe': self.env['ir.config_parameter'].sudo().get_str('l10n_es_edi_tbai.epigrafe'),
             'batuz_correction': self.env.context.get('batuz_correction'),
         }
         lroe_values.update(values)
@@ -872,4 +872,4 @@ class L10n_Es_Edi_TbaiDocument(models.Model):
         doc = self.xml_attachment_id
         if not doc:
             return None
-        return etree.fromstring(doc.raw.decode('utf-8'))
+        return etree.fromstring(doc.raw.content.decode('utf-8'))
