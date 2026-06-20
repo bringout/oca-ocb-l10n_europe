@@ -6,7 +6,7 @@ from odoo import fields, models
 class SaleOrder(models.Model):
     _inherit = "sale.order"
 
-    def _create_invoices(self, grouped=False, final=False, date=None):
+    def _create_account_invoices(self, invoice_vals_list, final):
         """ EXTENDS 'sale'
         Necessary because if someone creates an invoice after 9 pm Argentina time, if the invoice is created
         automatically, then it is created with the date of the next day (UTC date) instead of today.
@@ -16,7 +16,7 @@ class SaleOrder(models.Model):
 
         We took the same approach that was used in the POS module to set the date, in this case always forcing the
         Argentina timezone """
-        invoices = super()._create_invoices(grouped=grouped, final=final, date=date)
+        invoices = super()._create_account_invoices(invoice_vals_list, final)
         for invoice in invoices:
             if invoice.country_code == 'AR':
                 timezone = pytz.timezone('America/Buenos_Aires')

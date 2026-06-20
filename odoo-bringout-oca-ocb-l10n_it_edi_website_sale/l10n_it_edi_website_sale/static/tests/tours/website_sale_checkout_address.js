@@ -1,65 +1,65 @@
-odoo.define('l10n_it_edi_website_sale.tour', function (require) {
-'use strict';
+/** @odoo-module alias=l10n_it_edi_website_sale.tour **/
 
-var tour = require("web_tour.tour");
-const tourUtils = require('website_sale.tour_utils');
+import { registry } from "@web/core/registry";
+import * as tourUtils from "@website_sale/js/tours/tour_utils";
 
-tour.register('shop_checkout_address', {
-    test: true,
+registry.category("web_tour.tours").add('shop_checkout_address', {
     url: '/shop',
-},
-    [
+    steps: () => [
         {
             content: "search Storage Box",
             trigger: 'form input[name="search"]',
-            run: "text Storage Box",
+            run: "edit Storage Box",
         },
         {
             content: "search Storage Box",
             trigger: 'form:has(input[name="search"]) .oe_search_button',
+            run: "click",
         },
         {
             content: "select Storage Box",
             trigger: '.oe_product_cart:first a:contains("Storage Box")',
+            run: "click",
         },
         {
             id: 'add_cart_step',
             content: "click on add to cart",
             trigger: '#product_detail form[action^="/shop/cart/update"] #add_to_cart',
+            run: "click",
         },
             tourUtils.goToCart(),
         {
             content: "go to address form",
-            trigger: 'a[href="/shop/checkout?express=1"]',
+            trigger: 'a[href="/shop/checkout?try_skip_step=true"]',
+            run: "click",
         },
         // check if the fields Codice Fiscale and PA index are present
         {
             content: "check if the fields Codice Destinatario is present",
             trigger: 'input[name="l10n_it_pa_index"]',
-            run: "text 1234567890123456789012345",
+            run: "edit 1234567890123456789012345",
         },
         {
             content: "check if the fields Codice Fiscale is present",
             trigger: 'input[name="l10n_it_codice_fiscale"]',
-            run: "text 12345678901",
+            run: "edit 12345678901",
         },
     ]
-);
+});
 
-tour.register('shop_checkout_address_create_partner', {
-    test: true,
+registry.category("web_tour.tours").add('shop_checkout_address_create_partner', {
     url: '/shop',
-},
-    [
+    steps: () => [
         ...tourUtils.addToCart({ productName: "Storage Box" }),
         tourUtils.goToCart(),
         {
             content: "go to address form",
-            trigger: 'a[href="/shop/checkout?express=1"]',
+            trigger: 'a[href="/shop/checkout?try_skip_step=true"]',
+            run: "click",
         },
         {
             content: "Fill address form with VAT",
-            trigger: 'select[name="country_id"]',
+            trigger: 'form.checkout_autoformat',
             run: function () {
                 $('input[name="name"]').val('abc');
                 $('input[name="phone"]').val('99999999');
@@ -71,12 +71,11 @@ tour.register('shop_checkout_address_create_partner', {
             },
         },
         {
+            id: 'o_country_id',
             content: "Select country with code 'IT' to trigger compute of Codice Fiscale",
-            trigger: "select[name='country_id']",
+            trigger: "form.checkout_autoformat",
             run: function () {
-                const countrySelect = $("select[name='country_id']");
-                countrySelect.find('option[code="IT"]').attr('selected', true);
-                countrySelect.trigger('change');
+                $('select[name="country_id"]').val($('#o_country_id option[code="IT"]').val()).change();
             }
         },
         {
@@ -92,19 +91,16 @@ tour.register('shop_checkout_address_create_partner', {
             content: "Add state",
             trigger: 'select[name="state_id"]',
             run: function () {
-                $('#state_id option:contains(Cremona)').attr('selected', true);
+                $('select[name="state_id"]').val($('select[name="state_id"] option:eq(1)').val())
             },
         },
         {
             content: "Click on next button",
-            trigger: '.oe_cart .btn:contains("Next")',
+            trigger: '.oe_cart .btn:contains("Continue checkout")',
+            run: 'click',
         },
         {
             content: "Check selected billing address is same as typed in previous step",
-            trigger: '#shipping_and_billing:contains(SO1 Billing Street, 33):contains(SO1BillingCity)',
-            run: function () {}, // it's a check
+            trigger: '#shop_checkout:contains(SO1 Billing Street, 33):contains(SO1BillingCity)',
         },
-    ]
-);
-
-});
+]});

@@ -10,11 +10,10 @@ from lxml import etree
 class TestUBLNL(TestUBLCommon):
 
     @classmethod
-    def setUpClass(cls,
-                   chart_template_ref="l10n_nl.l10nnl_chart_template",
-                   edi_format_ref="account_edi_ubl_cii.edi_nlcius_1",
-                   ):
-        super().setUpClass(chart_template_ref=chart_template_ref, edi_format_ref=edi_format_ref)
+    @TestUBLCommon.setup_country('nl')
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.env['ir.config_parameter'].sudo().set_param('account_edi_ubl_cii.use_new_dict_to_xml_helpers', 'False')
 
         cls.partner_1 = cls.env['res.partner'].create({
             'name': "partner_1",
@@ -25,9 +24,11 @@ class TestUBLNL(TestUBLCommon):
             'phone': '+31 180 6 225789',
             'email': 'info@outlook.nl',
             'country_id': cls.env.ref('base.nl').id,
-            'bank_ids': [(0, 0, {'acc_number': 'NL000099998B57'})],
-            'l10n_nl_kvk': '77777677',
+            'bank_ids': [(0, 0, {'acc_number': 'NL000099998B57', 'allow_out_payment': True})],
+            'peppol_eas': '0106',
+            'peppol_endpoint': '77777677',
             'ref': 'ref_partner_1',
+            'invoice_edi_format': 'nlcius',
         })
 
         cls.partner_2 = cls.env['res.partner'].create({
@@ -37,9 +38,12 @@ class TestUBLNL(TestUBLCommon):
             'city': "Rotterdam",
             'vat': 'NL41452B11',
             'country_id': cls.env.ref('base.nl').id,
-            'bank_ids': [(0, 0, {'acc_number': 'NL93999574162167'})],
-            'l10n_nl_kvk': '1234567',
+            'bank_ids': [(0, 0, {'acc_number': 'NL93999574162167', 'allow_out_payment': True})],
+            'peppol_eas': '9944',
+            'peppol_endpoint': 'NL41452B11',
+            'company_registry': '123456789',
             'ref': 'ref_partner_2',
+            'invoice_edi_format': 'nlcius',
         })
 
         cls.tax_19 = cls.env['account.tax'].create({
@@ -84,17 +88,6 @@ class TestUBLNL(TestUBLCommon):
             'sequence': 1,
         })
 
-    @classmethod
-    def setup_company_data(cls, company_name, chart_template):
-        # OVERRIDE
-        # to force the company to be dutch
-        res = super().setup_company_data(
-            company_name,
-            chart_template=chart_template,
-            country_id=cls.env.ref("base.nl").id,
-        )
-        return res
-
     ####################################################
     # Test export - import
     ####################################################
@@ -130,28 +123,36 @@ class TestUBLNL(TestUBLCommon):
             ],
         )
         attachment = self._assert_invoice_attachment(
-            invoice,
-            xpaths='''
+            invoice.ubl_cii_xml_id,
+            xpaths=f'''
                 <xpath expr="./*[local-name()='ID']" position="replace">
-                    <ID>___ignore___</ID>
+                    <cbc:ID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">___ignore___</cbc:ID>
                 </xpath>
                 <xpath expr=".//*[local-name()='InvoiceLine'][1]/*[local-name()='ID']" position="replace">
-                    <ID>___ignore___</ID>
+                    <cbc:ID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">___ignore___</cbc:ID>
                 </xpath>
                 <xpath expr=".//*[local-name()='InvoiceLine'][2]/*[local-name()='ID']" position="replace">
-                    <ID>___ignore___</ID>
+                    <cbc:ID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">___ignore___</cbc:ID>
                 </xpath>
                 <xpath expr=".//*[local-name()='InvoiceLine'][3]/*[local-name()='ID']" position="replace">
-                    <ID>___ignore___</ID>
+                    <cbc:ID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">___ignore___</cbc:ID>
                 </xpath>
                 <xpath expr=".//*[local-name()='PaymentMeans']/*[local-name()='PaymentID']" position="replace">
-                    <PaymentID>___ignore___</PaymentID>
+                    <cbc:PaymentID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">___ignore___</cbc:PaymentID>
+                </xpath>
+                <xpath expr=".//*[local-name()='AdditionalDocumentReference']/*[local-name()='Attachment']/*[local-name()='EmbeddedDocumentBinaryObject']" position="attributes">
+                    <attribute name="mimeCode">application/pdf</attribute>
+                    <attribute name="filename">{invoice.invoice_pdf_report_id.name}</attribute>
                 </xpath>
             ''',
-            expected_file='from_odoo/nlcius_out_invoice.xml',
+            expected_file_path='from_odoo/nlcius_out_invoice.xml',
         )
         self.assertEqual(attachment.name[-10:], "nlcius.xml")
         self._assert_imported_invoice_from_etree(invoice, attachment)
+
+    def test_export_import_invoice_new(self):
+        self.env['ir.config_parameter'].sudo().set_param('account_edi_ubl_cii.use_new_dict_to_xml_helpers', True)
+        self.test_export_import_invoice()
 
     def test_export_import_refund(self):
         refund = self._generate_move(
@@ -184,38 +185,42 @@ class TestUBLNL(TestUBLCommon):
             ],
         )
         attachment = self._assert_invoice_attachment(
-            refund,
-            xpaths='''
+            refund.ubl_cii_xml_id,
+            xpaths=f'''
                 <xpath expr="./*[local-name()='ID']" position="replace">
-                    <ID>___ignore___</ID>
+                    <cbc:ID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">___ignore___</cbc:ID>
                 </xpath>
                 <xpath expr=".//*[local-name()='CreditNoteLine'][1]/*[local-name()='ID']" position="replace">
-                    <ID>___ignore___</ID>
+                    <cbc:ID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">___ignore___</cbc:ID>
                 </xpath>
                 <xpath expr=".//*[local-name()='CreditNoteLine'][2]/*[local-name()='ID']" position="replace">
-                    <ID>___ignore___</ID>
+                    <cbc:ID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">___ignore___</cbc:ID>
                 </xpath>
                 <xpath expr=".//*[local-name()='CreditNoteLine'][3]/*[local-name()='ID']" position="replace">
-                    <ID>___ignore___</ID>
+                    <cbc:ID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">___ignore___</cbc:ID>
                 </xpath>
                 <xpath expr=".//*[local-name()='PaymentMeans']/*[local-name()='PaymentID']" position="replace">
-                    <PaymentID>___ignore___</PaymentID>
+                    <cbc:PaymentID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">___ignore___</cbc:PaymentID>
+                </xpath>
+                <xpath expr=".//*[local-name()='AdditionalDocumentReference']/*[local-name()='Attachment']/*[local-name()='EmbeddedDocumentBinaryObject']" position="attributes">
+                    <attribute name="mimeCode">application/pdf</attribute>
+                    <attribute name="filename">{refund.invoice_pdf_report_id.name}</attribute>
                 </xpath>
             ''',
-            expected_file='from_odoo/nlcius_out_refund.xml',
+            expected_file_path='from_odoo/nlcius_out_refund.xml',
         )
         self.assertEqual(attachment.name[-10:], "nlcius.xml")
         self._assert_imported_invoice_from_etree(refund, attachment)
 
-    def test_export_fixed_tax_nlcius_and_peppol(self):
+    def test_export_import_refund_new(self):
+        self.env['ir.config_parameter'].sudo().set_param('account_edi_ubl_cii.use_new_dict_to_xml_helpers', True)
+        self.test_export_import_refund()
+
+    def test_export_fixed_tax(self):
         """
         Ensure that an invoice containing a product with a fixed tax posted to a journal with the peppol and nlcius edi
             tags generates edi documents with accurate LineExtensionAmount values
         """
-        self.journal.edi_format_ids = [
-            Command.link(self.env.ref('account_edi_ubl_cii.ubl_bis3').id)
-        ]
-
         invoice = self._generate_move(
             self.partner_1, self.partner_2,
             move_type='out_invoice',
@@ -226,17 +231,8 @@ class TestUBLNL(TestUBLCommon):
                 'tax_ids': [Command.set([self.tax_10_fixed.id, self.tax_7_purchase.id])]
             }]
         )
-
-        amounts = [
-            etree.fromstring(doc.attachment_id.raw).find(
-                './/{*}LegalMonetaryTotal/{*}LineExtensionAmount'
-            ).text
-            for doc in invoice.edi_document_ids.filtered(lambda d: d.edi_format_id.code in (
-                'ubl_bis3', 'nlcius_1'
-            ))
-        ]
-
-        self.assertEqual(amounts, ['60.00', '60.00'])
+        amount = etree.fromstring(invoice.ubl_cii_xml_id.raw).find('.//{*}LegalMonetaryTotal/{*}LineExtensionAmount').text
+        self.assertEqual(amount, '60.00')
 
     ####################################################
     # Test import
@@ -244,6 +240,13 @@ class TestUBLNL(TestUBLCommon):
 
     def test_import_invoice_xml(self):
         # test files https://github.com/peppolautoriteit-nl/validation ?
-        self._assert_imported_invoice_from_file(subfolder='tests/test_files/from_odoo',
-            filename='nlcius_out_invoice.xml', amount_total=3083.58, amount_tax=401.58,
-            list_line_subtotals=[1782, 1000, -100], currency_id=self.currency_data['currency'].id)
+        self._assert_imported_invoice_from_file(
+            subfolder='tests/test_files/from_odoo',
+            filename='nlcius_out_invoice.xml',
+            invoice_vals={
+                'currency_id': self.other_currency.id,
+                'amount_total': 3083.58,
+                'amount_tax': 401.58,
+                'invoice_lines': [{'price_subtotal': x} for x in (1782, 1000, -100)]
+            },
+        )

@@ -7,11 +7,11 @@ from freezegun import freeze_time
 
 from odoo.addons.account_payment.tests.common import AccountPaymentCommon
 from odoo.addons.sale.tests.common import SaleCommon
-from odoo.addons.l10n_ar.tests.common import TestAr
+from odoo.addons.l10n_ar.tests.common import TestArCommon
 
 
 @tagged('-at_install', 'post_install', 'post_install_l10n')
-class TestWebsiteSaleInvoice(AccountPaymentCommon, SaleCommon, TestAr):
+class TestArWebsiteSaleInvoice(AccountPaymentCommon, SaleCommon, TestArCommon):
 
     @classmethod
     def setUpClass(cls):
@@ -36,7 +36,7 @@ class TestWebsiteSaleInvoice(AccountPaymentCommon, SaleCommon, TestAr):
             self.amount = self.sale_order.amount_total
             tx = self._create_transaction(flow='redirect', sale_order_ids=[self.sale_order.id], state='done')
             with mute_logger('odoo.addons.sale.models.payment_transaction'):
-                tx.with_context(l10n_ar_invoice_skip_commit=True)._reconcile_after_done()
+                tx.with_context(l10n_ar_invoice_skip_commit=True)._post_process()
 
             invoice = self.sale_order.invoice_ids
             self.assertTrue(invoice, "Do not create the invoice")

@@ -31,7 +31,7 @@ Rules when creating a new partner: We will only see the identification types tha
 
 * If the partner have not country address set: Will show the generic identification types plus the ones defined in the partner's related company country (If the partner has not specific company then will show the identification types related to the current user company)
 
-* If the partner has country address : will show the generic identification types plus the ones defined for the country of the partner.
+* If the partner has country address: will show the generic identification types plus the ones defined for the country of the partner.
 
 When creating a new company, will set to the related partner always the related country is_vat identification type.
 
@@ -48,38 +48,15 @@ pip install odoo-bringout-oca-ocb-l10n_latam_base
 
 ## Dependencies
 
-This addon depends on:
 - contacts
 - base_vat
 
-## Manifest Information
-
-- **Name**: LATAM Localization Base
-- **Version**: 1.0
-- **Category**: Accounting/Localizations
-- **License**: LGPL-3
-- **Installable**: True
-
 ## Source
 
-Based on [OCA/OCB](https://github.com/OCA/OCB) branch 16.0, addon `l10n_latam_base`.
+- Repository: https://github.com/OCA/OCB
+- Branch: 18.0
+- Path: addons/l10n_latam_base
 
 ## License
 
-This package maintains the original LGPL-3 license from the upstream Odoo project.
-
-## Documentation
-
-- Overview: doc/OVERVIEW.md
-- Architecture: doc/ARCHITECTURE.md
-- Models: doc/MODELS.md
-- Controllers: doc/CONTROLLERS.md
-- Wizards: doc/WIZARDS.md
-- Reports: doc/REPORTS.md
-- Security: doc/SECURITY.md
-- Install: doc/INSTALL.md
-- Usage: doc/USAGE.md
-- Configuration: doc/CONFIGURATION.md
-- Dependencies: doc/DEPENDENCIES.md
-- Troubleshooting: doc/TROUBLESHOOTING.md
-- FAQ: doc/FAQ.md
+This package preserves the original LGPL-3 license.

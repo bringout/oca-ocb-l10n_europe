@@ -1,6 +1,6 @@
 from odoo.addons.point_of_sale.tests.common import TestPointOfSaleCommon
 from odoo.tests import tagged
-from ..models.pos import ORDER_FIELDS, LINE_FIELDS
+from ..models.pos import ORDER_FIELDS_BEFORE_17_4, ORDER_FIELDS_FROM_17_4, LINE_FIELDS
 from json import dumps
 
 
@@ -8,8 +8,8 @@ from json import dumps
 class TestStringToHash(TestPointOfSaleCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref="l10n_fr.l10n_fr_pcg_chart_template"):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
 
         cls.pricelist = cls.env['product.pricelist'].create({
             'name': 'Test Pricelist',
@@ -28,7 +28,11 @@ class TestStringToHash(TestPointOfSaleCommon):
 
         for order in orders:
             values = {}
-            for field in ORDER_FIELDS:
+            if order.pos_version:
+                order_fields = ORDER_FIELDS_FROM_17_4
+            else:
+                order_fields = ORDER_FIELDS_BEFORE_17_4
+            for field in order_fields:
                 values[field] = _getattrstring(order, field)
 
             for line in order.lines:
@@ -103,8 +107,8 @@ class TestStringToHash(TestPointOfSaleCommon):
             {'qty': 3, 'price_unit': 2000, 'tax_ids': self.tax_sale_b | self.tax_sale_b}
         ], [
             {'amount': 10000, 'payment_method': self.bank_payment_method},
-            {'amount': 1200, 'payment_method': self.cash_payment_method},
-            {'amount': 20000, 'payment_method': self.credit_payment_method}
+            {'amount': 8900, 'payment_method': self.cash_payment_method},
+            {'amount': 11000, 'payment_method': self.credit_payment_method}
         ])
         self.pos_config.current_session_id.action_pos_session_closing_control()
         self.assertEqual(order.l10n_fr_string_to_hash, self._compute_string_to_hash_original(order))
