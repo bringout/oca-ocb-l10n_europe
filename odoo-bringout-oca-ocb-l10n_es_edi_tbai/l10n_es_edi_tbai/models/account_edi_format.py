@@ -17,14 +17,14 @@ from pytz import timezone
 from requests.exceptions import RequestException
 
 from odoo import _, models, release
-from odoo.addons.l10n_es_edi_sii.models.account_edi_format import PatchedHTTPAdapter
+from odoo.addons.l10n_es.tools.http_adapter import PatchedHTTPAdapter
 from odoo.addons.l10n_es_edi_tbai.models.l10n_es_edi_tbai_agencies import get_key
 from odoo.addons.l10n_es_edi_tbai.models.xml_utils import (
     NS_MAP, bytes_as_block, calculate_references_digests,
     cleanup_xml_signature, fill_signature, int_as_bytes)
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import get_lang
-from odoo.tools.float_utils import float_repr
+from odoo.tools.float_utils import float_repr, float_round
 from odoo.tools.xml_utils import cleanup_xml_node, validate_xml_from_attachment
 
 
@@ -90,7 +90,7 @@ class AccountEdiFormat(models.Model):
         if invoice.move_type == 'out_refund':
             if not invoice.l10n_es_tbai_refund_reason:
                 raise ValidationError(_('Refund reason must be specified (TicketBAI)'))
-            if invoice._is_l10n_es_tbai_simplified():
+            if invoice.l10n_es_is_simplified:
                 if invoice.l10n_es_tbai_refund_reason != 'R5':
                     raise ValidationError(_('Refund reason must be R5 for simplified invoices (TicketBAI)'))
             else:
@@ -124,9 +124,9 @@ class AccountEdiFormat(models.Model):
                     error_msg = _("TicketBAI: Cannot post a refund without source documents")
                 else:
                     invalid_refunds = refunded_invoices.filtered(lambda inv:
-                        not inv._l10n_es_tbai_is_in_chain()
-                        and inv.edi_document_ids.filtered(lambda d: d.edi_format_id.code == 'es_tbai')  # avoid imported ones
-                    )
+                                                                 not inv._l10n_es_tbai_is_in_chain()
+                                                                 and inv.edi_document_ids.filtered(lambda d: d.edi_format_id.code == 'es_tbai')  # avoid imported ones
+                                                                 )
                     if invalid_refunds:
                         error_msg = _(
                             "TicketBAI: Cannot post a reversal move if its source documents (%s) have not been posted",
@@ -266,6 +266,10 @@ class AccountEdiFormat(models.Model):
         return xml_str
 
     def _get_l10n_es_tbai_invoice_xml(self, invoice, cancel=False):
+        def format_float(value, precision_digits=2):
+            rounded_value = float_round(value, precision_digits=precision_digits)
+            return float_repr(rounded_value, precision_digits=precision_digits)
+
         # If previously generated XML was posted and not rejected (success or timeout), reuse it
         doc = invoice._get_l10n_es_tbai_submitted_xml(cancel)
         if doc is not None:
@@ -282,7 +286,7 @@ class AccountEdiFormat(models.Model):
             'datetime_now': datetime.now(tz=timezone('Europe/Madrid')),
             'format_date': lambda d: datetime.strftime(d, '%d-%m-%Y'),
             'format_time': lambda d: datetime.strftime(d, '%H:%M:%S'),
-            'format_float': lambda f: float_repr(f, precision_digits=2),
+            'format_float': format_float,
         }
         template_name = 'l10n_es_edi_tbai.template_invoice_main' + ('_cancel' if cancel else '_post')
         xml_str = self.env['ir.qweb']._render(template_name, values)
@@ -312,7 +316,7 @@ class AccountEdiFormat(models.Model):
 
         # NOTE: TicketBai supports simplified invoices WITH recipients but we don't for now (we should for POS)
         # NOTE: TicketBAI credit notes for simplified invoices are ALWAYS simplified BUT can have a recipient even if invoice doesn't
-        if invoice._is_l10n_es_tbai_simplified():
+        if invoice.l10n_es_is_simplified:
             return values  # do not set 'recipient' unless there is an actual recipient (used as condition in template)
 
         # === RECIPIENTS (DESTINATARIOS) ===
@@ -382,7 +386,7 @@ class AccountEdiFormat(models.Model):
             invoice_lines.append({
                 'line': line,
                 'discount': -discount,
-                'unit_price': -(line.balance + discount) / line.quantity if line.quantity else 0.0,
+                'unit_price': -(line.balance + discount) / line.quantity if line.quantity > 0 else 0,
                 'total': total,
                 'description': regex_sub(r'[^0-9a-zA-Z ]', '', line.name or '')[:250]
             })
@@ -396,16 +400,16 @@ class AccountEdiFormat(models.Model):
         # Regime codes (ClaveRegimenEspecialOTrascendencia)
         # NOTE there's 11 more codes to implement, also there can be up to 3 in total
         # See https://www.gipuzkoa.eus/documents/2456431/13761128/Anexo+I.pdf/2ab0116c-25b4-f16a-440e-c299952d683d
-        com_partner = invoice.commercial_partner_id
+        export_exempts = invoice.invoice_line_ids.tax_ids.filtered(lambda t: t.l10n_es_exempt_reason == 'E2')
         # If an invoice line contains an OSS tax, the invoice is considered as an OSS operation
         is_oss = self._has_oss_taxes(invoice)
 
         if is_oss:
             values['regime_key'] = ['17']
-        elif not com_partner.country_id or com_partner.country_id.code in self.env.ref('base.europe').country_ids.mapped('code'):
-            values['regime_key'] = ['01']
-        else:
+        elif export_exempts:
             values['regime_key'] = ['02']
+        else:
+            values['regime_key'] = ['01']
 
         values['nosujeto_causa'] = 'IE' if is_oss else 'RL'
 
@@ -431,7 +435,7 @@ class AccountEdiFormat(models.Model):
         com_partner = invoice.commercial_partner_id
         sign = -1 if invoice.move_type in ('out_refund', 'in_refund') else 1
         if (com_partner.country_id.code in ('ES', False) and not (com_partner.vat or '').startswith("ESN")) \
-                or invoice._is_l10n_es_tbai_simplified():
+                or invoice.l10n_es_is_simplified:
             tax_details_info_vals = self._l10n_es_edi_get_invoices_tax_details_info(invoice)
             tax_amount_retention = tax_details_info_vals['tax_amount_retention']
             desglose = {'DesgloseFactura': tax_details_info_vals['tax_details_info']}
@@ -637,9 +641,9 @@ class AccountEdiFormat(models.Model):
             'format_float': lambda f: float_repr(f, precision_digits=2),
         }
         # Check if intracom
-        mod_303_10 = self.env.ref('l10n_es.mod_303_10')
-        mod_303_11 = self.env.ref('l10n_es.mod_303_11')
-        tax_tags = invoice.invoice_line_ids.tax_ids.invoice_repartition_line_ids.tag_ids
+        mod_303_10 = self.env.ref('l10n_es.mod_303_casilla_10_balance')._get_matching_tags()
+        mod_303_11 = self.env.ref('l10n_es.mod_303_casilla_11_balance')._get_matching_tags()
+        tax_tags = invoice.invoice_line_ids.tax_ids.repartition_line_ids.tag_ids
         intracom = bool(tax_tags & (mod_303_10 + mod_303_11))
         # Special regime for agriculture, livestock and fishing https://sede.agenciatributaria.gob.es/Sede/iva/regimenes-tributacion-iva/regimen-especial-agricultura-ganaderia-pesca.html
         reagyp = invoice.invoice_line_ids.tax_ids.filtered(lambda t: t.l10n_es_type == 'sujeto_agricultura')
@@ -656,6 +660,8 @@ class AccountEdiFormat(models.Model):
             values['credit_note_invoice'] = invoice.reversed_entry_id
         if reagyp:
             values['tipofactura'] = 'F6'
+        elif invoice._l10n_es_is_dua():
+            values['tipofactura'] = 'F5'
         else:
             values['tipofactura'] = 'F1'
         return values

@@ -2,7 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from base64 import b64encode
-from datetime import datetime
+from datetime import datetime, date
 
 from freezegun import freeze_time
 from lxml import etree
@@ -23,7 +23,7 @@ class TestEdiTbaiXmls(TestEsEdiTbaiCommon):
         cls.out_invoice = cls.env['account.move'].create({
             'name': 'INV/01',
             'move_type': 'out_invoice',
-            'invoice_date': datetime.now(),
+            'invoice_date': date(2022, 1, 1),
             'partner_id': cls.partner_a.id,
             'invoice_line_ids': [(0, 0, {
                 'product_id': cls.product_a.id,
@@ -48,6 +48,7 @@ class TestEdiTbaiXmls(TestEsEdiTbaiCommon):
         with freeze_time(self.frozen_today):
             invoice = self.out_invoice.copy({
                 'name': 'INV01',
+                'invoice_date': date(2022, 1, 1),
             })
             xml_doc = self.edi_format._get_l10n_es_tbai_invoice_xml(invoice, cancel=False)[invoice]['xml_file']
             xml_doc.remove(xml_doc.find("Signature", namespaces=NS_MAP))
@@ -98,17 +99,17 @@ class TestEdiTbaiXmls(TestEsEdiTbaiCommon):
                     <DetallesFactura>
                       <IDDetalleFactura>
                           <DescripcionDetalle>producta</DescripcionDetalle>
-                          <Cantidad>5.00</Cantidad>
-                          <ImporteUnitario>246.00</ImporteUnitario>
-                          <Descuento>246.00</Descuento>
-                          <ImporteTotal>1190.64</ImporteTotal>
+                          <Cantidad>5.00000000</Cantidad>
+                          <ImporteUnitario>246.00000000</ImporteUnitario>
+                          <Descuento>246.00000000</Descuento>
+                          <ImporteTotal>1190.64000000</ImporteTotal>
                       </IDDetalleFactura>
                       <IDDetalleFactura>
                           <DescripcionDetalle>producta</DescripcionDetalle>
-                          <Cantidad>5.00</Cantidad>
-                          <ImporteUnitario>246.00</ImporteUnitario>
-                          <Descuento>1230.00</Descuento>
-                          <ImporteTotal>0.00</ImporteTotal>
+                          <Cantidad>5.00000000</Cantidad>
+                          <ImporteUnitario>246.00000000</ImporteUnitario>
+                          <Descuento>1230.00000000</Descuento>
+                          <ImporteTotal>0.00000000</ImporteTotal>
                       </IDDetalleFactura>
                     </DetallesFactura>
                 </xpath>
@@ -230,7 +231,6 @@ class TestEdiTbaiXmls(TestEsEdiTbaiCommon):
             'date': str(self.out_invoice.invoice_date),
             'reason': 'no reason',
             'l10n_es_tbai_refund_reason': 'R1',
-            'refund_method': 'cancel',
             'journal_id': self.out_invoice.journal_id.id,
         })
         reversal = move_reversal.reverse_moves()
@@ -240,4 +240,18 @@ class TestEdiTbaiXmls(TestEsEdiTbaiCommon):
             xml_doc = self.edi_format._get_l10n_es_tbai_invoice_xml(reverse_move, cancel=False)[reverse_move]['xml_file']
             xml_doc.remove(xml_doc.find("Signature", namespaces=NS_MAP))
             xml_expected = etree.fromstring(super().L10N_ES_TBAI_CREDIT_NOTE_XML_POST)
+            self.assertXmlTreeEqual(xml_doc, xml_expected)
+
+    def test_xml_tree_fecha_operacion(self):
+        """
+        Test that when the invoice_date and delivery date are in the past but are the same
+        FechaOperacion appears in the xml since it is still different from
+        the date the xml is generated (FechaExpedicionFactura)
+        """
+        self.out_invoice.delivery_date = self.out_invoice.invoice_date
+
+        with freeze_time(self.frozen_today):
+            xml_doc = self.edi_format._get_l10n_es_tbai_invoice_xml(self.out_invoice, cancel=False)[self.out_invoice]['xml_file']
+            xml_doc.remove(xml_doc.find("Signature", namespaces=NS_MAP))
+            xml_expected = etree.fromstring(super().L10N_ES_TBAI_FECHA_OPERACION)
             self.assertXmlTreeEqual(xml_doc, xml_expected)

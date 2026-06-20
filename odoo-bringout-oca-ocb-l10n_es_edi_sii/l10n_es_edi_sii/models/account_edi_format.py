@@ -1,58 +1,14 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 from collections import defaultdict
-from urllib3.util.ssl_ import create_urllib3_context, DEFAULT_CIPHERS
-from urllib3.contrib.pyopenssl import inject_into_urllib3
-from OpenSSL.crypto import load_certificate, load_privatekey, FILETYPE_PEM
 
 from odoo import fields, models, _
+from odoo.addons.l10n_es.tools.http_adapter import PatchedHTTPAdapter
 from odoo.tools import html_escape, zeep
 
 import math
 import json
 import requests
-
-
-# Custom patches to perform the WSDL requests.
-EUSKADI_CIPHERS = f"{DEFAULT_CIPHERS}:!DH"
-
-
-class PatchedHTTPAdapter(requests.adapters.HTTPAdapter):
-    """ An adapter to block DH ciphers which may not work for the tax agencies called"""
-
-    def init_poolmanager(self, *args, **kwargs):
-        # OVERRIDE
-        inject_into_urllib3()
-        kwargs['ssl_context'] = create_urllib3_context(ciphers=EUSKADI_CIPHERS)
-        return super().init_poolmanager(*args, **kwargs)
-
-    def cert_verify(self, conn, url, verify, cert):
-        # OVERRIDE
-        # The last parameter is only used by the super method to check if the file exists.
-        # In our case, cert is an odoo record 'l10n_es_edi.certificate' so not a path to a file.
-        # By putting 'None' as last parameter, we ensure the check about TLS configuration is
-        # still made without checking temporary files exist.
-        super().cert_verify(conn, url, verify, None)
-        conn.cert_file = cert
-        conn.key_file = None
-
-    def get_connection(self, url, proxies=None):
-        # OVERRIDE
-        # Patch the OpenSSLContext to decode the certificate in-memory.
-        conn = super().get_connection(url, proxies=proxies)
-        context = conn.conn_kw['ssl_context']
-
-        def patched_load_cert_chain(l10n_es_odoo_certificate, keyfile=None, password=None):
-            cert_file, key_file, _certificate = l10n_es_odoo_certificate.sudo()._decode_certificate()
-            cert_obj = load_certificate(FILETYPE_PEM, cert_file)
-            pkey_obj = load_privatekey(FILETYPE_PEM, key_file)
-
-            context._ctx.use_certificate(cert_obj)
-            context._ctx.use_privatekey(pkey_obj)
-
-        context.load_cert_chain = patched_load_cert_chain
-
-        return conn
 
 
 class AccountEdiFormat(models.Model):
@@ -75,10 +31,12 @@ class AccountEdiFormat(models.Model):
 
         def filter_to_apply(base_line, tax_values):
             # For intra-community, we do not take into account the negative repartition line
-            return tax_values['tax_repartition_line'].factor_percent > 0.0
+            return (tax_values['tax_repartition_line'].factor_percent > 0.0
+                    and tax_values['tax_repartition_line'].tax_id.amount != -100.0
+                    and tax_values['tax_repartition_line'].tax_id.l10n_es_type != 'ignore')
 
         def full_filter_invl_to_apply(invoice_line):
-            if 'ignore' in invoice_line.tax_ids.flatten_taxes_hierarchy().mapped('l10n_es_type'):
+            if all(t == 'ignore' for t in invoice_line.tax_ids.flatten_taxes_hierarchy().mapped('l10n_es_type')):
                 return False
             return filter_invl_to_apply(invoice_line) if filter_invl_to_apply else True
 
@@ -118,7 +76,6 @@ class AccountEdiFormat(models.Model):
         tax_subject_info_list = []
         tax_subject_isp_info_list = []
         for tax_values in tax_details['tax_details'].values():
-
             if invoice.is_sale_document():
                 # Customer invoices
 
@@ -161,7 +118,7 @@ class AccountEdiFormat(models.Model):
 
             else:
                 # Vendor bills
-                if tax_values['l10n_es_type'] in ('sujeto', 'sujeto_isp', 'no_sujeto', 'no_sujeto_loc'):
+                if tax_values['l10n_es_type'] in ('sujeto', 'sujeto_isp', 'no_sujeto', 'no_sujeto_loc', 'dua', 'sujeto_agricultura'):
                     tax_amount_deductible += tax_values['tax_amount']
                 elif tax_values['l10n_es_type'] == 'retencion':
                     tax_amount_retention += tax_values['tax_amount']
@@ -218,6 +175,11 @@ class AccountEdiFormat(models.Model):
             tax_details_info['NoSujeta']['ImportePorArticulos7_14_Otros'] = round(sign * base_amount_not_subject, 2)
         if has_not_subject_loc and invoice.is_sale_document():
             tax_details_info['NoSujeta']['ImporteTAIReglasLocalizacion'] = round(sign * base_amount_not_subject_loc, 2)
+        if not tax_details_info and invoice.is_sale_document():
+            if any(t['l10n_es_type'] == 'no_sujeto' for t in tax_details['tax_details'].values()):
+                tax_details_info['NoSujeta']['ImportePorArticulos7_14_Otros'] = 0
+            if any(t['l10n_es_type'] == 'no_sujeto_loc' for t in tax_details['tax_details'].values()):
+                tax_details_info['NoSujeta']['ImporteTAIReglasLocalizacion'] = 0
 
         return {
             'tax_details_info': tax_details_info,
@@ -230,44 +192,20 @@ class AccountEdiFormat(models.Model):
         }
 
     def _l10n_es_edi_get_partner_info(self, partner):
-        eu_country_codes = set(self.env.ref('base.europe').country_ids.mapped('code'))
-
-        partner_info = {}
-        IDOtro_ID = partner.vat or 'NO_DISPONIBLE'
-
-        if (not partner.country_id or partner.country_id.code == 'ES') and partner.vat:
-            # ES partner with VAT.
-            partner_info['NIF'] = partner.vat[2:] if partner.vat.startswith('ES') else partner.vat
-            if self.env.context.get('error_1117'):
-                partner_info['IDOtro'] = {'IDType': '07', 'ID': IDOtro_ID}
-
-        elif partner.country_id.code in eu_country_codes and partner.vat:
-            # European partner.
-            partner_info['IDOtro'] = {'IDType': '02', 'ID': IDOtro_ID}
-        else:
-            partner_info['IDOtro'] = {'ID': IDOtro_ID}
-            if partner.vat:
-                partner_info['IDOtro']['IDType'] = '04'
-            else:
-                partner_info['IDOtro']['IDType'] = '06'
-            if partner.country_id:
-                partner_info['IDOtro']['CodigoPais'] = partner.country_id.code
-        return partner_info
+        return partner._l10n_es_edi_get_partner_info()
 
     def _l10n_es_edi_get_invoices_info(self, invoices):
         eu_country_codes = set(self.env.ref('base.europe').country_ids.mapped('code'))
 
-        simplified_partner = self.env.ref("l10n_es_edi_sii.partner_simplified")
-
         info_list = []
         for invoice in invoices:
             com_partner = invoice.commercial_partner_id
-            is_simplified = invoice.partner_id == simplified_partner
+            is_simplified = invoice.l10n_es_is_simplified
 
             info = {
                 'PeriodoLiquidacion': {
                     'Ejercicio': str(invoice.date.year),
-                    'Periodo': str(invoice.date.month).zfill(2),
+                    'Periodo': invoice._l10n_es_edi_get_period(),
                 },
                 'IDFactura': {
                     'FechaExpedicionFacturaEmisor': invoice.invoice_date.strftime('%d-%m-%Y'),
@@ -285,6 +223,8 @@ class AccountEdiFormat(models.Model):
 
             # === Invoice ===
 
+            if invoice.delivery_date and invoice.delivery_date != invoice.invoice_date:
+                invoice_node['FechaOperacion'] = invoice.delivery_date.strftime('%d-%m-%Y')
             invoice_node['DescripcionOperacion'] = invoice.invoice_origin[:500] if invoice.invoice_origin else 'manual'
             reagyp = invoice.invoice_line_ids.tax_ids.filtered(lambda t: t.l10n_es_type == 'sujeto_agricultura')
             if invoice.is_sale_document():
@@ -307,6 +247,8 @@ class AccountEdiFormat(models.Model):
                 else:
                     invoice_node['ClaveRegimenEspecialOTrascendencia'] = '01'
             else:
+                if invoice._l10n_es_is_dua():
+                    partner_info = self._l10n_es_edi_get_partner_info(invoice.company_id.partner_id)
                 info['IDFactura']['IDEmisorFactura'] = partner_info
                 # In case of cancel
                 info["IDFactura"]["IDEmisorFactura"].update(
@@ -324,9 +266,9 @@ class AccountEdiFormat(models.Model):
                 else:
                     invoice_node['FechaRegContable'] = fields.Date.context_today(self).strftime('%d-%m-%Y')
 
-                mod_303_10 = self.env.ref('l10n_es.mod_303_10')
-                mod_303_11 = self.env.ref('l10n_es.mod_303_11')
-                tax_tags = invoice.invoice_line_ids.tax_ids.invoice_repartition_line_ids.tag_ids
+                mod_303_10 = self.env.ref('l10n_es.mod_303_casilla_10_balance')._get_matching_tags()
+                mod_303_11 = self.env.ref('l10n_es.mod_303_casilla_11_balance')._get_matching_tags()
+                tax_tags = invoice.invoice_line_ids.tax_ids.repartition_line_ids.tag_ids
                 intracom = bool(tax_tags & (mod_303_10 + mod_303_11))
                 if intracom:
                     invoice_node['ClaveRegimenEspecialOTrascendencia'] = '09'
@@ -343,6 +285,8 @@ class AccountEdiFormat(models.Model):
             elif invoice.move_type == 'in_invoice':
                 if reagyp:
                     invoice_node['TipoFactura'] = 'F6'
+                elif invoice._l10n_es_is_dua():
+                    invoice_node['TipoFactura'] = 'F5'
                 else:
                     invoice_node['TipoFactura'] = 'F1'
             elif invoice.move_type == 'in_refund':
@@ -411,7 +355,7 @@ class AccountEdiFormat(models.Model):
                 if tax_details_info_other_vals['tax_details_info']:
                     invoice_node['DesgloseFactura']['DesgloseIVA'] = tax_details_info_other_vals['tax_details_info']
 
-                if any(t.l10n_es_type == 'ignore' for t in invoice.invoice_line_ids.tax_ids):
+                if invoice._l10n_es_is_dua() or any(t.l10n_es_type == 'ignore' for t in invoice.invoice_line_ids.tax_ids):
                     invoice_node['ImporteTotal'] = round(sign * (
                             tax_details_info_isp_vals['tax_details']['base_amount']
                             + tax_details_info_isp_vals['tax_details']['tax_amount']
@@ -568,11 +512,14 @@ class AccountEdiFormat(models.Model):
             else:
                 # 'ref' can be the same for different partners.
                 candidates = invoices.filtered(lambda x: x.ref[:60] == invoice_number)
-                if len(candidates) >= 1:
+                if len(candidates) > 1:
                     respl_partner_info = respl.IDFactura.IDEmisorFactura
                     inv = None
                     for candidate in candidates:
-                        partner_info = self._l10n_es_edi_get_partner_info(candidate.commercial_partner_id)
+                        partner = candidate.commercial_partner_id
+                        if candidate._l10n_es_is_dua():
+                            partner = candidate.company_id.partner_id
+                        partner_info = self._l10n_es_edi_get_partner_info(partner)
                         if partner_info.get('NIF') and partner_info['NIF'] == respl_partner_info.NIF:
                             inv = candidate
                             break
@@ -623,7 +570,7 @@ class AccountEdiFormat(models.Model):
     def _has_oss_taxes(self, invoice):
         oss_tag = self.env.ref('l10n_eu_oss.tag_oss', raise_if_not_found=False)
         lines = invoice.invoice_line_ids.filtered(lambda line: line.display_type not in ('line_section', 'line_note'))
-        tags = (lines.tax_ids.invoice_repartition_line_ids | lines.tax_ids.refund_repartition_line_ids).tag_ids
+        tags = lines.tax_ids.repartition_line_ids.tag_ids
         return bool(oss_tag and oss_tag in tags)
 
     # -------------------------------------------------------------------------

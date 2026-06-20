@@ -2,6 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import api, fields, models
+from odoo.tools import get_quarter_number
 
 
 class AccountMove(models.Model):
@@ -22,12 +23,22 @@ class AccountMove(models.Model):
     # COMPUTE METHODS
     # -------------------------------------------------------------------------
 
-    @api.depends('move_type', 'company_id')
+    @api.depends('move_type', 'company_id', 'invoice_line_ids.tax_ids')
     def _compute_l10n_es_edi_is_required(self):
         for move in self:
+            has_tax = True
+            # Check it is not an importation invoice (which will be report through the DUA invoice)
+            if move.is_purchase_document():
+                taxes = move.invoice_line_ids.tax_ids
+                has_tax = any(t.l10n_es_type and t.l10n_es_type != 'ignore' for t in taxes)
             move.l10n_es_edi_is_required = move.is_invoice() \
                                            and move.country_code == 'ES' \
-                                           and move.company_id.l10n_es_edi_tax_agency
+                                           and move.company_id.l10n_es_edi_tax_agency \
+                                           and has_tax
+
+    def _l10n_es_is_dua(self):
+        self.ensure_one()
+        return any(t.l10n_es_type == 'dua' for t in self.invoice_line_ids.tax_ids.flatten_taxes_hierarchy())
 
     def _check_edi_documents_for_reset_to_draft(self):
         docs = self.edi_document_ids.filtered(lambda d: d.edi_format_id._needs_web_services())
@@ -40,3 +51,10 @@ class AccountMove(models.Model):
         if len(docs) == 1 and docs.edi_format_id.code == 'es_sii' and docs.state != 'to_cancel':
             return True
         return super()._edi_allow_button_draft()
+
+    def _l10n_es_edi_get_period(self):
+        self.ensure_one()
+        if 'account_tax_periodicity' in self.company_id._fields:
+            if self.company_id.account_tax_periodicity == 'trimester':
+                return f'{get_quarter_number(self.date)}T'
+        return str(self.date.month).zfill(2)

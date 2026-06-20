@@ -4,10 +4,10 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 16.0\n"
+"Project-Id-Version: Odoo Server 17.0+e\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-05-20 09:26+0000\n"
-"PO-Revision-Date: 2025-05-20 09:26+0000\n"
+"POT-Creation-Date: 2025-12-29 19:01+0000\n"
+"PO-Revision-Date: 2025-12-29 19:01+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -16,57 +16,13 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. module: l10n_es_edi_sii
-#: model_terms:ir.ui.view,arch_db:l10n_es_edi_sii.res_config_settings_view_form
-msgid ""
-"<span class=\"o_form_label\">Registro de Libros connection SII</span>\n"
-"                            <span class=\"fa fa-lg fa-building-o\" title=\"Values set here are company-specific.\" groups=\"base.group_multi_company\"/>"
+#: model:ir.model,name:l10n_es_edi_sii.model_account_move_send
+msgid "Account Move Send"
 msgstr ""
 
 #. module: l10n_es_edi_sii
 #: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__res_company__l10n_es_edi_tax_agency__aeat
 msgid "Agencia Tributaria española"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_exempt_reason__e1
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_exempt_reason__e1
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_exempt_reason__e1
-msgid "Art. 20"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_exempt_reason__e2
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_exempt_reason__e2
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_exempt_reason__e2
-msgid "Art. 21"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_exempt_reason__e3
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_exempt_reason__e3
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_exempt_reason__e3
-msgid "Art. 22"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_exempt_reason__e4
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_exempt_reason__e4
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_exempt_reason__e4
-msgid "Art. 23 y 24"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_exempt_reason__e5
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_exempt_reason__e5
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_exempt_reason__e5
-msgid "Art. 25"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields,field_description:l10n_es_edi_sii.field_account_tax__l10n_es_bien_inversion
-#: model:ir.model.fields,field_description:l10n_es_edi_sii.field_account_tax_template__l10n_es_bien_inversion
-#: model:ir.model.fields,field_description:l10n_es_edi_sii.field_l10n_es_sii_account_tax_mixin__l10n_es_bien_inversion
-msgid "Bien de Inversion"
 msgstr ""
 
 #. module: l10n_es_edi_sii
@@ -142,25 +98,6 @@ msgid "EDI format"
 msgstr ""
 
 #. module: l10n_es_edi_sii
-#: model:ir.model,name:l10n_es_edi_sii.model_mail_template
-msgid "Email Templates"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields,field_description:l10n_es_edi_sii.field_account_tax__l10n_es_exempt_reason
-#: model:ir.model.fields,field_description:l10n_es_edi_sii.field_account_tax_template__l10n_es_exempt_reason
-#: model:ir.model.fields,field_description:l10n_es_edi_sii.field_l10n_es_sii_account_tax_mixin__l10n_es_exempt_reason
-msgid "Exempt Reason (Spain)"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_type__exento
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_type__exento
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_type__exento
-msgid "Exento"
-msgstr ""
-
-#. module: l10n_es_edi_sii
 #: model:ir.model.fields,field_description:l10n_es_edi_sii.field_l10n_es_edi_certificate__content
 msgid "File"
 msgstr ""
@@ -181,13 +118,6 @@ msgid "ID"
 msgstr ""
 
 #. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_type__ignore
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_type__ignore
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_type__ignore
-msgid "Ignore even the base amount"
-msgstr ""
-
-#. module: l10n_es_edi_sii
 #: model:ir.model.fields,field_description:l10n_es_edi_sii.field_account_bank_statement_line__l10n_es_edi_is_required
 #: model:ir.model.fields,field_description:l10n_es_edi_sii.field_account_move__l10n_es_edi_is_required
 #: model:ir.model.fields,field_description:l10n_es_edi_sii.field_account_payment__l10n_es_edi_is_required
@@ -203,11 +133,6 @@ msgstr ""
 #: model:ir.model.fields,field_description:l10n_es_edi_sii.field_res_company__l10n_es_edi_certificate_ids
 #: model:ir.model.fields,field_description:l10n_es_edi_sii.field_res_config_settings__l10n_es_edi_certificate_ids
 msgid "L10N Es Edi Certificate"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields,field_description:l10n_es_edi_sii.field_l10n_es_edi_certificate____last_update
-msgid "Last Modified on"
 msgstr ""
 
 #. module: l10n_es_edi_sii
@@ -277,36 +202,8 @@ msgid ""
 msgstr ""
 
 #. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_type__no_deducible
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_type__no_deducible
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_type__no_deducible
-msgid "No Deducible"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_type__no_sujeto
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_type__no_sujeto
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_type__no_sujeto
-msgid "No Sujeto"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_type__no_sujeto_loc
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_type__no_sujeto_loc
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_type__no_sujeto_loc
-msgid "No Sujeto por reglas de Localization"
-msgstr ""
-
-#. module: l10n_es_edi_sii
 #: model_terms:ir.ui.view,arch_db:l10n_es_edi_sii.res_config_settings_view_form
 msgid "No tax agency selected: SII not activated."
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_exempt_reason__e6
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_exempt_reason__e6
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_exempt_reason__e6
-msgid "Otros"
 msgstr ""
 
 #. module: l10n_es_edi_sii
@@ -349,13 +246,6 @@ msgid "Production mode: EDI data is sent to the official agency servers."
 msgstr ""
 
 #. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_type__recargo
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_type__recargo
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_type__recargo
-msgid "Recargo de Equivalencia"
-msgstr ""
-
-#. module: l10n_es_edi_sii
 #: model:ir.model.fields,field_description:l10n_es_edi_sii.field_account_bank_statement_line__l10n_es_registration_date
 #: model:ir.model.fields,field_description:l10n_es_edi_sii.field_account_move__l10n_es_registration_date
 #: model:ir.model.fields,field_description:l10n_es_edi_sii.field_account_payment__l10n_es_registration_date
@@ -363,20 +253,13 @@ msgid "Registration Date"
 msgstr ""
 
 #. module: l10n_es_edi_sii
+#: model_terms:ir.ui.view,arch_db:l10n_es_edi_sii.res_config_settings_view_form
+msgid "Registro de Libros connection SII"
+msgstr ""
+
+#. module: l10n_es_edi_sii
 #: model:ir.model,name:l10n_es_edi_sii.model_account_resequence_wizard
 msgid "Remake the sequence of Journal Entries."
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_type__retencion
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_type__retencion
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_type__retencion
-msgid "Retencion"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model,name:l10n_es_edi_sii.model_l10n_es_sii_account_tax_mixin
-msgid "SII Fields"
 msgstr ""
 
 #. module: l10n_es_edi_sii
@@ -390,42 +273,9 @@ msgid "Spain Localization"
 msgstr ""
 
 #. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_type__sujeto
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_type__sujeto
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_type__sujeto
-msgid "Sujeto"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_type__sujeto_agricultura
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_type__sujeto_agricultura
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_type__sujeto_agricultura
-msgid "Sujeto Agricultura"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax__l10n_es_type__sujeto_isp
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__account_tax_template__l10n_es_type__sujeto_isp
-#: model:ir.model.fields.selection,name:l10n_es_edi_sii.selection__l10n_es_sii_account_tax_mixin__l10n_es_type__sujeto_isp
-msgid "Sujeto ISP"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model,name:l10n_es_edi_sii.model_account_tax
-msgid "Tax"
-msgstr ""
-
-#. module: l10n_es_edi_sii
 #: model:ir.model.fields,field_description:l10n_es_edi_sii.field_res_company__l10n_es_edi_tax_agency
 #: model:ir.model.fields,field_description:l10n_es_edi_sii.field_res_config_settings__l10n_es_edi_tax_agency
 msgid "Tax Agency for SII"
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model.fields,field_description:l10n_es_edi_sii.field_account_tax__l10n_es_type
-#: model:ir.model.fields,field_description:l10n_es_edi_sii.field_account_tax_template__l10n_es_type
-#: model:ir.model.fields,field_description:l10n_es_edi_sii.field_l10n_es_sii_account_tax_mixin__l10n_es_type
-msgid "Tax Type (Spain)"
 msgstr ""
 
 #. module: l10n_es_edi_sii
@@ -433,11 +283,6 @@ msgstr ""
 msgid ""
 "Tax agency selected: invoices will be sent by SII for journals where it is "
 "activated."
-msgstr ""
-
-#. module: l10n_es_edi_sii
-#: model:ir.model,name:l10n_es_edi_sii.model_account_tax_template
-msgid "Templates for Taxes"
 msgstr ""
 
 #. module: l10n_es_edi_sii

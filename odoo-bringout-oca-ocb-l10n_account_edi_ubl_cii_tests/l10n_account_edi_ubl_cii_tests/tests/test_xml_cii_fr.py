@@ -7,11 +7,8 @@ from odoo.tests import tagged
 class TestCIIFR(TestUBLCommon):
 
     @classmethod
-    def setUpClass(cls,
-                   chart_template_ref="l10n_fr.l10n_fr_pcg_chart_template",
-                   edi_format_ref="account_edi_ubl_cii.edi_facturx_1_0_05",
-                   ):
-        super().setUpClass(chart_template_ref=chart_template_ref, edi_format_ref=edi_format_ref)
+    def setUpClass(cls, chart_template_ref="fr"):
+        super().setUpClass(chart_template_ref=chart_template_ref)
 
         cls.partner_1 = cls.env['res.partner'].create({
             'name': "partner_1",
@@ -20,7 +17,7 @@ class TestCIIFR(TestUBLCommon):
             'city': "Paris",
             'vat': 'FR05677404089',
             'country_id': cls.env.ref('base.fr').id,
-            'bank_ids': [(0, 0, {'acc_number': 'FR15001559627230'})],
+            'bank_ids': [(0, 0, {'acc_number': 'FR15001559627230', 'allow_out_payment': True})],
             'phone': '+1 (650) 555-0111',
             'email': "partner1@yourcompany.com",
             'ref': 'ref_partner_1',
@@ -33,7 +30,7 @@ class TestCIIFR(TestUBLCommon):
             'city': "Colombey-les-Deux-Églises",
             'vat': 'FR35562153452',
             'country_id': cls.env.ref('base.fr').id,
-            'bank_ids': [(0, 0, {'acc_number': 'FR90735788866632'})],
+            'bank_ids': [(0, 0, {'acc_number': 'FR90735788866632', 'allow_out_payment': True})],
             'ref': 'ref_partner_2',
         })
 
@@ -109,6 +106,8 @@ class TestCIIFR(TestUBLCommon):
             country_id=cls.env.ref("base.fr").id,
             phone='+1 (650) 555-0111',  # [BR-DE-6] "Seller contact telephone number" (BT-42) is required
             email="info@yourcompany.com",  # [BR-DE-7] The element "Seller contact email address" (BT-43) is required
+            vat='FR23334175221', # [BR-CO-26]-In order for the buyer to automatically ...
+            zip='123', # [BR-DE-4] The element "Seller post code" (BT-38) must be transmitted.
         )
         return res
 
@@ -120,27 +119,27 @@ class TestCIIFR(TestUBLCommon):
         acc_bank = self.env['res.partner.bank'].create({
             'acc_number': 'FR15001559627231',
             'partner_id': self.company_data['company'].partner_id.id,
+            'allow_out_payment': True,
         })
-        invoice = self.env['account.move'].create({
-            'move_type': 'out_invoice',
-            'journal_id': self.journal.id,
-            'partner_id': self.partner_1.id,
-            'partner_bank_id': acc_bank.id,
-            'invoice_date': '2017-01-01',
-            'date': '2017-01-01',
-            'currency_id': self.currency_data['currency'].id,
-            'invoice_line_ids': [(0, 0, {
+
+        invoice = self._generate_move(
+            self.partner_1,
+            self.partner_2,
+            move_type='out_invoice',
+            partner_bank_id=acc_bank.id,
+            invoice_line_ids=[{
                 'product_id': self.product_a.id,
                 'product_uom_id': self.env.ref('uom.product_uom_dozen').id,
                 'price_unit': 275.0,
                 'quantity': 5,
                 'discount': 20.0,
                 'tax_ids': [(6, 0, self.tax_21.ids)],
-            })],
-        })
-        invoice.action_post()
-        pdf_attachment = invoice._get_edi_attachment(self.edi_format)
-        self.assertEqual(pdf_attachment['name'], 'factur-x.xml')
+            }],
+        )
+
+        pdf_attachment = invoice.ubl_cii_xml_id
+        facturx_filename = self.env['account.edi.xml.cii']._export_invoice_filename(invoice)
+        self.assertEqual(pdf_attachment['name'], facturx_filename)
 
     def test_export_import_invoice(self):
         invoice = self._generate_move(
@@ -173,7 +172,7 @@ class TestCIIFR(TestUBLCommon):
             ],
         )
         attachment = self._assert_invoice_attachment(
-            invoice,
+            invoice.ubl_cii_xml_id,
             xpaths='''
                 <xpath expr="./*[local-name()='ExchangedDocument']/*[local-name()='ID']" position="replace">
                         <ID>___ignore___</ID>
@@ -185,9 +184,10 @@ class TestCIIFR(TestUBLCommon):
                         <PaymentReference>___ignore___</PaymentReference>
                 </xpath>
             ''',
-            expected_file='from_odoo/facturx_out_invoice.xml',
+            expected_file_path='from_odoo/facturx_out_invoice.xml',
         )
-        self.assertEqual(attachment.name, "factur-x.xml")
+        facturx_filename = self.env['account.edi.xml.cii']._export_invoice_filename(invoice)
+        self.assertEqual(attachment.name, facturx_filename)
         self._assert_imported_invoice_from_etree(invoice, attachment)
 
     def test_export_import_refund(self):
@@ -221,7 +221,7 @@ class TestCIIFR(TestUBLCommon):
             ],
         )
         attachment = self._assert_invoice_attachment(
-            refund,
+            refund.ubl_cii_xml_id,
             xpaths='''
                 <xpath expr="./*[local-name()='ExchangedDocument']/*[local-name()='ID']" position="replace">
                         <ID>___ignore___</ID>
@@ -230,9 +230,10 @@ class TestCIIFR(TestUBLCommon):
                         <IssuerAssignedID>___ignore___</IssuerAssignedID>
                 </xpath>
             ''',
-            expected_file='from_odoo/facturx_out_refund.xml'
+            expected_file_path='from_odoo/facturx_out_refund.xml'
         )
-        self.assertEqual(attachment.name, "factur-x.xml")
+        facturx_filename = self.env['account.edi.xml.cii']._export_invoice_filename(refund)
+        self.assertEqual(attachment.name, facturx_filename)
         self._assert_imported_invoice_from_etree(refund, attachment)
 
     def test_export_tax_included(self):
@@ -274,7 +275,7 @@ class TestCIIFR(TestUBLCommon):
             ],
         )
         self._assert_invoice_attachment(
-            invoice,
+            invoice.ubl_cii_xml_id,
             xpaths='''
                 <xpath expr="./*[local-name()='ExchangedDocument']/*[local-name()='ID']" position="replace">
                         <ID>___ignore___</ID>
@@ -283,11 +284,18 @@ class TestCIIFR(TestUBLCommon):
                         <IssuerAssignedID>___ignore___</IssuerAssignedID>
                 </xpath>
             ''',
-            expected_file='from_odoo/facturx_out_invoice_tax_incl.xml'
+            expected_file_path='from_odoo/facturx_out_invoice_tax_incl.xml'
         )
 
     def test_encoding_in_attachment_facturx(self):
-        self._test_encoding_in_attachment('facturx_1_0_05', 'factur-x.xml')
+        invoice = self._generate_move(
+            seller=self.partner_1,
+            buyer=self.partner_2,
+            move_type='out_invoice',
+            invoice_line_ids=[{'product_id': self.product_a.id}],
+        )
+        facturx_filename = self.env['account.edi.xml.cii']._export_invoice_filename(invoice)
+        self._test_encoding_in_attachment(invoice.ubl_cii_xml_id, facturx_filename)
 
     def test_export_with_fixed_taxes_case1(self):
         # CASE 1: simple invoice with a recupel tax
@@ -305,7 +313,7 @@ class TestCIIFR(TestUBLCommon):
             ],
         )
         self.assertEqual(invoice.amount_total, 121)
-        self._assert_invoice_attachment(invoice, None, 'from_odoo/facturx_ecotaxes_case1.xml')
+        self._assert_invoice_attachment(invoice.ubl_cii_xml_id, None, 'from_odoo/facturx_ecotaxes_case1.xml')
 
     def test_export_with_fixed_taxes_case2(self):
         # CASE 2: Same but with several ecotaxes
@@ -323,7 +331,7 @@ class TestCIIFR(TestUBLCommon):
             ],
         )
         self.assertEqual(invoice.amount_total, 121)
-        self._assert_invoice_attachment(invoice, None, 'from_odoo/facturx_ecotaxes_case2.xml')
+        self._assert_invoice_attachment(invoice.ubl_cii_xml_id, None, 'from_odoo/facturx_ecotaxes_case2.xml')
 
     def test_export_with_fixed_taxes_case3(self):
         # CASE 3: same as Case 1 but taxes are Price Included
@@ -345,54 +353,38 @@ class TestCIIFR(TestUBLCommon):
             ],
         )
         self.assertEqual(invoice.amount_total, 121)
-        self._assert_invoice_attachment(invoice, None, 'from_odoo/facturx_ecotaxes_case3.xml')
+        self._assert_invoice_attachment(invoice.ubl_cii_xml_id, None, 'from_odoo/facturx_ecotaxes_case3.xml')
 
     ####################################################
     # Test import
     ####################################################
 
     def test_import_partner_facturx(self):
-        """
-        Given an invoice where partner_1 is the vendor and partner_2 is the customer with an EDI attachment.
-        * Uploading the attachment as an invoice should create an invoice with the buyer = partner_2.
-        * Uploading the attachment as a vendor bill should create a bill with the vendor = partner_1.
-        """
         invoice = self._generate_move(
             seller=self.partner_1,
             buyer=self.partner_2,
             move_type='out_invoice',
             invoice_line_ids=[{'product_id': self.product_a.id}],
         )
-        new_invoice = self._import_invoice_attachment(invoice, 'facturx_1_0_05', self.company_data['default_journal_sale'])
-        self.assertEqual(self.partner_2, new_invoice.partner_id)
+        self._test_import_partner(invoice.ubl_cii_xml_id, self.partner_1, self.partner_2)
 
-        new_invoice = self._import_invoice_attachment(invoice, 'facturx_1_0_05', self.company_data['default_journal_purchase'])
-        self.assertEqual(self.partner_1, new_invoice.partner_id)
-
-    def test_import_journal_facturx(self):
-        """
-        If the context contains the info about the current default journal, we should use it
-        instead of infering the journal from the move type.
-        """
-        journal2 = self.company_data['default_journal_sale'].copy()
-        journal2.default_account_id = self.company_data['default_account_revenue'].id
+    def test_import_in_journal_facturx(self):
         invoice = self._generate_move(
             seller=self.partner_1,
             buyer=self.partner_2,
             move_type='out_invoice',
             invoice_line_ids=[{'product_id': self.product_a.id}],
         )
-        edi_attachment = invoice._get_edi_attachment(self.env.ref('account_edi_ubl_cii.edi_facturx_1_0_05')).id
-
-        new_invoice = self.env['account.journal'].with_context(default_move_type='out_invoice')._create_document_from_attachment(edi_attachment)
-        self.assertEqual(new_invoice.journal_id, self.company_data['default_journal_sale'])
-
-        new_invoice = self.env['account.journal'].with_context(default_journal_id=journal2.id)._create_document_from_attachment(edi_attachment)
-        self.assertEqual(new_invoice.journal_id, journal2)
+        self._test_import_in_journal(invoice.ubl_cii_xml_id)
 
     def test_import_and_create_partner_facturx(self):
         """ Tests whether the partner is created at import if no match is found when decoding the EDI attachment
         """
+        self.env['res.partner.bank'].sudo().create({
+            'acc_number': 'FR15001559627230',
+            'partner_id': self.company_data['company'].partner_id.id,
+            'allow_out_payment': True,
+        })
         partner_vals = {
             'name': "Buyer",
             'mail': "buyer@yahoo.com",
@@ -400,7 +392,7 @@ class TestCIIFR(TestUBLCommon):
             'vat': "FR89215010646",
         }
         # assert there is no matching partner
-        partner_match = self.env['account.edi.format']._retrieve_partner(**partner_vals)
+        partner_match = self.env['res.partner']._retrieve_partner(**partner_vals)
         self.assertFalse(partner_match)
 
         # Import attachment as an invoice
@@ -408,7 +400,7 @@ class TestCIIFR(TestUBLCommon):
             'move_type': 'out_invoice',
             'journal_id': self.company_data['default_journal_sale'].id,
         })
-        self.update_invoice_from_file(
+        self._update_invoice_from_file(
             module_name='l10n_account_edi_ubl_cii_tests',
             subfolder='tests/test_files/from_odoo',
             filename='facturx_test_import_partner.xml',
@@ -457,6 +449,11 @@ class TestCIIFR(TestUBLCommon):
         )
 
     def test_import_fnfe_examples(self):
+        self.env['res.partner.bank'].sudo().create({
+            'acc_number': 'FR76 1254 2547 2569 8542 5874 698',
+            'partner_id': self.company_data['company'].partner_id.id,
+            'allow_out_payment': True,
+        })
         # Source: official documentation of the FNFE (subdirectory: "5. FACTUR-X 1.0.06 - Examples")
         subfolder = 'tests/test_files/from_factur-x_doc'
         # the 2 following files have the same pdf but one is labelled as an invoice and the other as a refund
@@ -478,6 +475,11 @@ class TestCIIFR(TestUBLCommon):
         See the tests above to create these xml attachments ('test_export_with_fixed_taxes_case_[X]').
         NB: use move_type = 'out_invoice' s.t. we can retrieve the taxes used to create the invoices.
         """
+        self.env['res.partner.bank'].sudo().create({
+            'acc_number': 'FR15001559627230',
+            'partner_id': self.company_data['company'].partner_id.id,
+            'allow_out_payment': True,
+        })
         subfolder = "tests/test_files/from_odoo"
         self._assert_imported_invoice_from_file(
             subfolder=subfolder, filename='facturx_ecotaxes_case1.xml', amount_total=121, amount_tax=22,
@@ -494,3 +496,19 @@ class TestCIIFR(TestUBLCommon):
             list_line_subtotals=[99], currency_id=self.currency_data['currency'].id, list_line_price_unit=[99],
             list_line_discount=[0], list_line_taxes=[self.tax_21+self.recupel], move_type='out_invoice',
         )
+
+    def test_facturx_has_no_negative_lines(self):
+        """
+        Test that the is no negative ChargeAmount in the facturx xml
+        """
+        invoice = self._generate_move(
+            seller=self.partner_1,
+            buyer=self.partner_2,
+            move_type='out_invoice',
+            invoice_line_ids=[
+                {'product_id': self.product_a.id, 'quantity': 1, 'price_unit': 100.0, 'tax_ids': [(6, 0, [self.tax_sale_a.id])],},
+                {'product_id': self.product_b.id, 'quantity': 1, 'price_unit': -50.0, 'tax_ids': [(6, 0, [self.tax_sale_a.id])],}
+            ],
+        )
+
+        self._assert_invoice_attachment(invoice.ubl_cii_xml_id, None, 'from_odoo/facturx_positive_discount_price_unit.xml')

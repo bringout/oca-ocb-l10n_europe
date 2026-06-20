@@ -4,10 +4,10 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 16.0\n"
+"Project-Id-Version: Odoo Server 17.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-10-30 09:34+0000\n"
-"PO-Revision-Date: 2024-10-30 09:34+0000\n"
+"POT-Creation-Date: 2025-12-29 19:01+0000\n"
+"PO-Revision-Date: 2024-10-30 12:37+0000\n"
 "Last-Translator: Manon Rondou <ronm@odoo.com>\n"
 "Language-Team: \n"
 "Language: fr\n"
@@ -26,7 +26,7 @@ msgstr "(Réf. reçu : %s)"
 #. module: l10n_fr_pos_cert
 #. odoo-javascript
 #: code:addons/l10n_fr_pos_cert/static/src/xml/OrderReceipt.xml:0
-#: code:addons/l10n_fr_pos_cert/static/src/xml/Orderline.xml:0
+#: code:addons/l10n_fr_pos_cert/static/src/xml/ProductScreen.xml:0
 #, python-format
 msgid "/ Units"
 msgstr "/ Unité"
@@ -74,7 +74,7 @@ msgstr ""
 #. module: l10n_fr_pos_cert
 #: model_terms:ir.ui.view,arch_db:l10n_fr_pos_cert.form_view_account_sale_closing
 msgid "Account Closing"
-msgstr "Clotûre de Compte"
+msgstr "Clotûre de compte"
 
 #. module: l10n_fr_pos_cert
 #. odoo-python
@@ -98,13 +98,6 @@ msgstr ""
 "Une erreur s'est produite lors de la vérification de l'inaltérabilité. "
 "Impossible de récupérer la dernière commande de caisse unique et "
 "comptabilisée."
-
-#. module: l10n_fr_pos_cert
-#. odoo-javascript
-#: code:addons/l10n_fr_pos_cert/static/src/js/Chrome.js:0
-#, python-format
-msgid "An unknown error prevents us from getting closing information."
-msgstr "Une erreur inconnue empêche d'obtenir les informations de fermeture."
 
 #. module: l10n_fr_pos_cert
 #: model:ir.model.fields.selection,name:l10n_fr_pos_cert.selection__account_sale_closing__frequency__annually
@@ -163,7 +156,7 @@ msgstr "Créé le"
 #. module: l10n_fr_pos_cert
 #: model:ir.model.fields,field_description:l10n_fr_pos_cert.field_account_sale_closing__cumulative_total
 msgid "Cumulative Grand Total"
-msgstr "Grant Total Cumulé"
+msgstr "Grand total cumulé"
 
 #. module: l10n_fr_pos_cert
 #: model:ir.model.fields,field_description:l10n_fr_pos_cert.field_account_sale_closing__currency_id
@@ -180,7 +173,7 @@ msgstr "Journalière"
 #: code:addons/l10n_fr_pos_cert/models/account_closing.py:0
 #, python-format
 msgid "Daily Closing"
-msgstr "Clôture Journalière"
+msgstr "Clôture journalière"
 
 #. module: l10n_fr_pos_cert
 #: model:ir.model.fields,help:l10n_fr_pos_cert.field_account_sale_closing__date_closing_start
@@ -229,19 +222,16 @@ msgstr "Fréquence et numéro de séquence unique"
 
 #. module: l10n_fr_pos_cert
 #: model:ir.actions.server,name:l10n_fr_pos_cert.account_sale_closing_annually_ir_actions_server
-#: model:ir.cron,cron_name:l10n_fr_pos_cert.account_sale_closing_annually
 msgid "Generate Annual Sales Closing"
 msgstr "Générer la clôture annuelle des ventes"
 
 #. module: l10n_fr_pos_cert
 #: model:ir.actions.server,name:l10n_fr_pos_cert.account_sale_closing_daily_ir_actions_server
-#: model:ir.cron,cron_name:l10n_fr_pos_cert.account_sale_closing_daily
 msgid "Generate Daily Sales Closing"
 msgstr "Générer la clôture journalière des ventes"
 
 #. module: l10n_fr_pos_cert
 #: model:ir.actions.server,name:l10n_fr_pos_cert.account_sale_closing_monthly_ir_actions_server
-#: model:ir.cron,cron_name:l10n_fr_pos_cert.account_sale_closing_monthly
 msgid "Generate Monthly Sales Closing"
 msgstr "Générer la clôture mensuelle des ventes"
 
@@ -311,11 +301,6 @@ msgid "Last Hash"
 msgstr "Dernier hachage"
 
 #. module: l10n_fr_pos_cert
-#: model:ir.model.fields,field_description:l10n_fr_pos_cert.field_account_sale_closing____last_update
-msgid "Last Modified on"
-msgstr "Dernière modification le"
-
-#. module: l10n_fr_pos_cert
 #: model:ir.model.fields,field_description:l10n_fr_pos_cert.field_account_sale_closing__last_order_hash
 msgid "Last Order entry's inalteralbility hash"
 msgstr "Hachage d'inaltérabilité sur la dernière commande"
@@ -366,18 +351,11 @@ msgstr "Nom"
 
 #. module: l10n_fr_pos_cert
 #. odoo-javascript
-#: code:addons/l10n_fr_pos_cert/static/src/js/Chrome.js:0
-#, python-format
-msgid "Network Error"
-msgstr "Erreur réseau"
-
-#. module: l10n_fr_pos_cert
-#. odoo-javascript
 #: code:addons/l10n_fr_pos_cert/static/src/xml/OrderReceipt.xml:0
-#: code:addons/l10n_fr_pos_cert/static/src/xml/Orderline.xml:0
+#: code:addons/l10n_fr_pos_cert/static/src/xml/ProductScreen.xml:0
 #, python-format
 msgid "Old unit price:"
-msgstr "Anciennement:"
+msgstr "Anciennement :"
 
 #. module: l10n_fr_pos_cert
 #: model:ir.actions.server,name:l10n_fr_pos_cert.action_check_pos_hash_integrity
@@ -389,13 +367,6 @@ msgstr "Vérification d'inaltérabilité de la caisse"
 #: model:ir.model.fields,field_description:l10n_fr_pos_cert.field_account_sale_closing__total_interval
 msgid "Period Total"
 msgstr "Total sur la période"
-
-#. module: l10n_fr_pos_cert
-#. odoo-javascript
-#: code:addons/l10n_fr_pos_cert/static/src/js/Chrome.js:0
-#, python-format
-msgid "Please check your internet connection and try again."
-msgstr "Veuillez vérifier votre connexion internet et réessayez."
 
 #. module: l10n_fr_pos_cert
 #: model:ir.model,name:l10n_fr_pos_cert.model_pos_config
@@ -552,13 +523,6 @@ msgstr ""
 "Toutes les ventes effectuées via le Point de Vente\n"
 "                                                sont bien dans la chaîne de "
 "hachage."
-
-#. module: l10n_fr_pos_cert
-#. odoo-javascript
-#: code:addons/l10n_fr_pos_cert/static/src/js/Chrome.js:0
-#, python-format
-msgid "Unknown Error"
-msgstr "Erreur inconnue"
 
 #. module: l10n_fr_pos_cert
 #. odoo-python

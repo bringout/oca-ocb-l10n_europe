@@ -38,17 +38,14 @@ class IrActionsReport(models.Model):
         report = self._get_report(report_ref)
         if self._is_invoice_report(report_ref):
             invoices = self.env[report.model].browse(res_ids)
-            # Determine which invoices need a QR/ISR.
+            # Determine which invoices need a QR.
             qr_inv_ids = []
-            isr_inv_ids = []
             for invoice in invoices:
                 # avoid duplicating existing streams
                 if report.attachment_use and report.retrieve_attachment(invoice):
                     continue
                 if invoice.l10n_ch_is_qr_valid:
                     qr_inv_ids.append(invoice.id)
-                elif invoice.company_id.country_code == 'CH' and invoice.l10n_ch_isr_valid:
-                    isr_inv_ids.append(invoice.id)
             # Render the additional reports.
             streams_to_append = {}
             if qr_inv_ids:
@@ -76,23 +73,17 @@ class IrActionsReport(models.Model):
                     for invoice_id, stream in qr_res.items():
                         qr_pdf = OdooPdfFileReader(stream['stream'], strict=False)
                         header_pdf = OdooPdfFileReader(header_res[invoice_id]['stream'], strict=False)
-
-                        page = header_pdf.getPage(0)
-                        page.mergePage(qr_pdf.getPage(0))
-
                         output_pdf = OdooPdfFileWriter()
-                        output_pdf.addPage(page)
+                        output_pdf.addPage(header_pdf.getPage(0))
+                        page = output_pdf.getPage(-1)
+                        page.mergePage(qr_pdf.getPage(0))
+                        page.compressContentStreams()
                         new_pdf_stream = io.BytesIO()
                         output_pdf.write(new_pdf_stream)
                         streams_to_append[invoice_id] = {'stream': new_pdf_stream}
                 else:
                     for invoice_id, stream in qr_res.items():
                         streams_to_append[invoice_id] = stream
-
-            if isr_inv_ids:
-                isr_res = self._render_qweb_pdf_prepare_streams('l10n_ch.l10n_ch_isr_report', data, res_ids=isr_inv_ids)
-                for invoice_id, stream in isr_res.items():
-                    streams_to_append[invoice_id] = stream
 
             # Add to results
             for invoice_id, additional_stream in streams_to_append.items():

@@ -13,7 +13,7 @@ from .common import TestEsEdiTbaiCommon
 class TestEdiTbaiWebServices(TestEsEdiTbaiCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref='l10n_es.account_chart_template_full', edi_format_ref='l10n_es_edi_tbai.edi_es_tbai'):
+    def setUpClass(cls, chart_template_ref='es_full', edi_format_ref='l10n_es_edi_tbai.edi_es_tbai'):
         super().setUpClass(chart_template_ref=chart_template_ref, edi_format_ref=edi_format_ref)
 
         # Operations tested here should be available to a billing user

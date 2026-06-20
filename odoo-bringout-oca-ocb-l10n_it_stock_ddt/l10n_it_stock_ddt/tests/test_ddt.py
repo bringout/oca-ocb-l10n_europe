@@ -8,7 +8,7 @@ from odoo.tests import tagged, Form
 class TestDDT(TestSaleCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref='l10n_it.l10n_it_chart_template_generic'):
+    def setUpClass(cls, chart_template_ref='it'):
         super().setUpClass(chart_template_ref=chart_template_ref)
         cls.company_data['company'].write({
                         'vat':"IT12345670017",
@@ -22,6 +22,7 @@ class TestDDT(TestSaleCommon):
         cls.env['res.partner.bank'].create({
             'acc_number': 'IT60X0542811101000000123456',
             'partner_id': cls.company_data['company'].partner_id.id,
+            'allow_out_payment': True,
         })
         cls.partner_a.write({
             'street': 'Piazza Guglielmo Marconi 5',
@@ -32,9 +33,9 @@ class TestDDT(TestSaleCommon):
         })
 
         settings = cls.env['res.config.settings'].create({})
-        if hasattr(settings, 'button_create_proxy_user'):
+        if hasattr(settings, '_create_proxy_user'):
             # Needed when `l10n_it_edi_sdiscoop` is installed
-            settings.button_create_proxy_user()
+            settings._create_proxy_user(cls.company_data['company'], 'demo')
 
     @classmethod
     def setup_company_data(cls, company_name, **kwargs):
@@ -72,7 +73,7 @@ class TestDDT(TestSaleCommon):
 
         # deliver partially
         pick = self.so.picking_ids
-        pick.move_ids.write({'quantity_done': 1})
+        pick.move_ids.write({'quantity': 1, 'picked': True})
         wiz_act = pick.button_validate()
         wiz = Form(self.env[wiz_act['res_model']].with_context(wiz_act['context'])).save()
         wiz.process()
@@ -84,14 +85,14 @@ class TestDDT(TestSaleCommon):
 
         # deliver partially
         pickx1 = self.so.picking_ids.filtered(lambda p: p.state != 'done')
-        pickx1.move_ids.write({'quantity_done': 1})
+        pickx1.move_ids.write({'quantity': 1, 'picked': True})
         wiz_act = pickx1.button_validate()
         wiz = Form(self.env[wiz_act['res_model']].with_context(wiz_act['context'])).save()
         wiz.process()
 
         # and again
         pickx2 = self.so.picking_ids.filtered(lambda p: p.state != 'done')
-        pickx2.move_ids.write({'quantity_done': 2})
+        pickx2.move_ids.write({'quantity': 2, 'picked': True})
         wiz_act = pickx2.button_validate()
         wiz = Form(self.env[wiz_act['res_model']].with_context(wiz_act['context'])).save()
         wiz.process()
@@ -129,7 +130,7 @@ class TestDDT(TestSaleCommon):
 
         # deliver partially
         picking_1 = so.picking_ids
-        picking_1.move_ids.write({'quantity_done': 1})
+        picking_1.move_ids.write({'quantity': 1, 'picked': True})
         wiz_act = picking_1.button_validate()
         wiz = Form(self.env[wiz_act['res_model']].with_context(wiz_act['context'])).save()
         wiz.process()
@@ -139,7 +140,7 @@ class TestDDT(TestSaleCommon):
         invoice_1.action_post()
 
         picking_2 = so.picking_ids.filtered(lambda p: p.state != 'done')
-        picking_2.move_ids.write({'quantity_done': 2})
+        picking_2.move_ids.write({'quantity': 2, 'picked': True})
         picking_2.button_validate()
 
         invoice_2 = so._create_invoices()

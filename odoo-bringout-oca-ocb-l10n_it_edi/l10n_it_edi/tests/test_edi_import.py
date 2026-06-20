@@ -1,18 +1,14 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-import datetime
-import logging
+import uuid
 from freezegun import freeze_time
-from lxml import etree
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from odoo import Command, fields, sql_db
-from odoo.tests import tagged
+from odoo import fields, sql_db, tools, Command
+from odoo.tests import new_test_user, tagged
 from odoo.addons.l10n_it_edi.tests.common import TestItEdi
-from odoo.addons.l10n_it_edi.tools.remove_signature import remove_signature
 
-_logger = logging.getLogger(__name__)
 
 @tagged('post_install_l10n', 'post_install', '-at_install')
 class TestItEdiImport(TestItEdi):
@@ -42,69 +38,112 @@ class TestItEdiImport(TestItEdi):
           </FatturaElettronicaBody>
         </p:FatturaElettronica>"""
 
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-
-        # Build test data.
-        # invoice_filename1 is used for vendor bill receipts tests
-        # invoice_filename2 is used for vendor bill tests
-        cls.invoice_filename1 = 'IT01234567890_FPR01.xml'
-        cls.invoice_filename2 = 'IT01234567890_FPR02.xml'
-        cls.signed_invoice_filename = 'IT01234567890_FPR01.xml.p7m'
-        cls.wrongly_signed_invoice_filename = 'IT09633951000_NpFwF.xml.p7m'
-        cls.invoice_content = cls._get_test_file_content(cls.invoice_filename1)
-        cls.signed_invoice_content = cls._get_test_file_content(cls.signed_invoice_filename)
-        cls.wrongly_signed_invoice_content = cls._get_test_file_content(cls.wrongly_signed_invoice_filename)
-        cls.invoice = cls.env['account.move'].create({
-            'move_type': 'in_invoice',
-            'ref': '01234567890'
-        })
-        cls.attachment = cls.env['ir.attachment'].create({
-            'name': cls.invoice_filename1,
-            'raw': cls.invoice_content,
-            'res_id': cls.invoice.id,
-            'res_model': 'account.move',
-        })
-        cls.edi_document = cls.env['account.edi.document'].create({
-            'edi_format_id': cls.edi_format.id,
-            'move_id': cls.invoice.id,
-            'attachment_id': cls.attachment.id,
-            'state': 'sent'
-        })
-
-        cls.test_invoice_xmls = {k: cls._get_test_file_content(v) for k, v in [
-            ('normal_1', 'IT01234567890_FPR01.xml'),
-            ('signed', 'IT01234567890_FPR01.xml.p7m'),
-        ]}
-
-    def mock_commit(self):
-        pass
-
     # -----------------------------
-    #
     # Vendor bills
-    #
     # -----------------------------
 
     def test_receive_vendor_bill(self):
-        """ Test a sample e-invoice file from https://www.fatturapa.gov.it/export/documenti/fatturapa/v1.2/IT01234567890_FPR01.xml """
-        content = etree.fromstring(self.invoice_content)
-        invoices = self.edi_format._create_invoice_from_xml_tree(self.invoice_filename2, content)
-        self.assertTrue(bool(invoices))
+        """ Test a sample e-invoice file from
+        https://www.fatturapa.gov.it/export/documenti/fatturapa/v1.2/IT01234567890_FPR01.xml
+        """
+
+        test_product = self.env['product.product'].create({
+            'name': 'Test Product',
+            'default_code': 'TEST',
+            'standard_price': 75.0,
+        })
+
+        # Added to ensures that a 0.00 unit price from XML is preserved.
+        applied_xml = """
+            <xpath expr="//FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee" position="after">
+                <DettaglioLinee>
+                    <NumeroLinea>2</NumeroLinea>
+                    <CodiceArticolo>
+                        <CodiceTipo>INTERNAL</CodiceTipo>
+                        <CodiceValore>TEST</CodiceValore>
+                    </CodiceArticolo>
+                    <Descrizione>[TEST] Test Product</Descrizione>
+                    <Quantita>1.00</Quantita>
+                    <PrezzoUnitario>0.00</PrezzoUnitario>
+                    <PrezzoTotale>0.00</PrezzoTotale>
+                    <AliquotaIVA>22.00</AliquotaIVA>
+                </DettaglioLinee>
+            </xpath>
+        """
+
+        self._assert_import_invoice('IT01234567890_FPR01.xml', [{
+            'move_type': 'in_invoice',
+            'invoice_date': fields.Date.from_string('2014-12-18'),
+            'amount_untaxed': 5.0,
+            'amount_tax': 1.1,
+            'invoice_line_ids': [
+                {
+                    'quantity': 5.0,
+                    'price_unit': 1.0,
+                    'debit': 5.0,
+                },
+                {
+                    'product_id': test_product.id,
+                    'quantity': 1.0,
+                    'price_unit': 0.0,
+                    'debit': 0.0,
+                },
+            ],
+        }], applied_xml)
+
+    def test_receive_negative_vendor_bill(self):
+        """ Same vendor bill as test_receive_vendor_bill but negative unit price """
+        self._assert_import_invoice('IT01234567890_FPR02.xml', [{
+            'move_type': 'in_invoice',
+            'invoice_date': fields.Date.from_string('2014-12-18'),
+            'amount_untaxed': -5.0,
+            'amount_tax': -1.1,
+            'invoice_line_ids': [{
+                'quantity': 5.0,
+                'price_unit': -1.0,
+                'credit': 5.0,
+            }],
+        }])
 
     def test_receive_signed_vendor_bill(self):
-        """ Test a signed (P7M) sample e-invoice file from https://www.fatturapa.gov.it/export/documenti/fatturapa/v1.2/IT01234567890_FPR01.xml """
-        with freeze_time('2020-04-06'):
-            content = etree.fromstring(remove_signature(self.signed_invoice_content))
-            invoices = self.edi_format._create_invoice_from_xml_tree(self.signed_invoice_filename, content)
+        """ Test a signed (P7M) sample e-invoice file from
+        https://www.fatturapa.gov.it/export/documenti/fatturapa/v1.2/IT01234567890_FPR01.xml
+        """
+        self._assert_import_invoice('IT01234567890_FPR01.xml.p7m', [{
+            'name': 'BILL/2014/12/0001',
+            'ref': '01234567890',
+            'invoice_date': fields.Date.from_string('2014-12-18'),
+            'amount_untaxed': 5.0,
+            'amount_tax': 1.1,
+            'invoice_line_ids': [{
+                'quantity': 5.0,
+                'price_unit': 1.0,
+            }],
+        }])
 
-            self.assertRecordValues(invoices, [{
-                'company_id': self.company.id,
-                'name': 'BILL/2014/12/0001',
-                'invoice_date': datetime.date(2014, 12, 18),
-                'ref': '01234567890',
-            }])
+    def test_receive_bill_sequence(self):
+        """ Ensure that the received bill gets assigned the right sequence. """
+        def mock_commit(self):
+            pass
+
+        invoices = self.env['account.move'].with_company(self.company).search([('name', '=', 'BILL/2019/01/0001')])
+        self.assertEqual(len(invoices), 0)
+
+        filename = 'IT01234567890_FPR02.xml'
+        with (patch.object(self.proxy_user.__class__, '_decrypt_data', return_value=self.fake_test_content),
+              patch.object(sql_db.Cursor, "commit", mock_commit),
+              freeze_time('2019-01-01')):
+            self.env['account.move'].with_company(self.company)._l10n_it_edi_process_downloads({
+                '999999999': {
+                    'filename': filename,
+                    'file': self.fake_test_content,
+                    'key': str(uuid.uuid4()),
+                }},
+                self.proxy_user,
+            )
+
+        invoices = self.env['account.move'].with_company(self.company).search([('name', '=', 'BILL/2019/01/0001')])
+        self.assertEqual(len(invoices), 1)
 
     def test_receive_wrongly_signed_vendor_bill(self):
         """
@@ -125,34 +164,21 @@ class TestItEdiImport(TestItEdi):
             task-3502910
         """
         with freeze_time('2019-01-01'):
-            filename, content = (
-                self.wrongly_signed_invoice_filename,
-                self.wrongly_signed_invoice_content,
-            )
-            tree = self.edi_format._decode_p7m_to_xml(filename, content)
-            invoices = self.edi_format._create_invoice_from_xml_tree(filename, tree)
-
-            self.assertRecordValues(invoices, [{
+            self._assert_import_invoice('IT09633951000_NpFwF.xml.p7m', [{
                 'name': 'BILL/2023/09/0001',
                 'ref': '333333333333333',
                 'invoice_date': fields.Date.from_string('2023-09-08'),
-                'amount_untaxed': 57.54,
+                'amount_untaxed': 39.54,
                 'amount_tax': 3.95,
             }])
 
     def test_cron_receives_bill_from_another_company(self):
         """ Ensure that when from one of your company, you bill the other, the
         import isn't impeded because of conflicts with the filename """
-        fattura_pa = self.env.ref('l10n_it_edi.edi_fatturaPA')
-        content = self.fake_test_content.encode()
-
-        # Our test content is not encrypted
-        proxy_user = MagicMock()
-        proxy_user.company_id = self.company
-        proxy_user._decrypt_data.return_value = content
-
         other_company = self.company_data['company']
         filename = 'IT01234567890_FPR02.xml'
+        def mock_commit(self):
+            pass
 
         invoice = self.env['account.move'].with_company(other_company).create({
             'move_type': 'out_invoice',
@@ -166,22 +192,27 @@ class TestItEdiImport(TestItEdi):
         })
         self.env['ir.attachment'].with_company(other_company).create({
             'name': filename,
-            'datas': content,
+            'raw': self.fake_test_content,
             'res_model': 'account.move',
             'res_id': invoice.id,
+            'res_field': 'l10n_it_edi_attachment_file',
         })
 
-        with patch.object(sql_db.Cursor, "commit", self.mock_commit):
-            fattura_pa._save_incoming_attachment_fattura_pa(
-                proxy_user=proxy_user,
-                id_transaction='9999999999',
-                filename=filename,
-                content=content,
-                key=None)
+        with (patch.object(self.proxy_user.__class__, '_decrypt_data', return_value=self.fake_test_content),
+              patch.object(sql_db.Cursor, "commit", mock_commit)):
+            self.env['account.move'].with_company(self.company)._l10n_it_edi_process_downloads(
+                {'999999999': {
+                    'filename': filename,
+                    'file': self.fake_test_content,
+                    'key': str(uuid.uuid4()),
+                }},
+                self.proxy_user,
+            )
 
         attachment = self.env['ir.attachment'].search([
             ('name', '=', 'IT01234567890_FPR02.xml'),
             ('res_model', '=', 'account.move'),
+            ('res_field', '=', 'l10n_it_edi_attachment_file'),
             ('company_id', '=', self.company.id),
         ])
         self.assertTrue(attachment)
@@ -190,55 +221,258 @@ class TestItEdiImport(TestItEdi):
     def test_receive_same_vendor_bill_twice(self):
         """ Test that the second time we are receiving an SdiCoop invoice, the second is discarded """
 
-        fattura_pa = self.env.ref('l10n_it_edi.edi_fatturaPA')
-        content = self.fake_test_content.encode()
-
         # Our test content is not encrypted
-        proxy_user = MagicMock()
-        proxy_user.company_id = self.company
-        proxy_user._decrypt_data.return_value = content
+        ProxyUser = self.env['account_edi_proxy_client.user']
+        proxy_user = ProxyUser.create({
+            'company_id': self.company.id,
+            'proxy_type': 'l10n_it_edi',
+            'id_client': str(uuid.uuid4()),
+            'edi_identification': ProxyUser._get_proxy_identification(self.company, 'l10n_it_edi'),
+            'private_key': str(uuid.uuid4()),
+        })
 
-        with patch.object(sql_db.Cursor, "commit", self.mock_commit):
+        filename = 'IT01234567890_FPR02.xml'
+
+        def mock_commit(self):
+            pass
+
+        with (patch.object(proxy_user.__class__, '_decrypt_data', return_value=self.fake_test_content),
+              patch.object(sql_db.Cursor, "commit", mock_commit),
+              tools.mute_logger("odoo.addons.l10n_it_edi.models.account_move")):
             for dummy in range(2):
-                fattura_pa._save_incoming_attachment_fattura_pa(
-                    proxy_user=proxy_user,
-                    id_transaction='9999999999',
-                    filename=self.invoice_filename2,
-                    content=content,
-                    key=None)
+                processed = self.env['account.move']._l10n_it_edi_process_downloads({
+                    '999999999': {
+                        'filename': filename,
+                        'file': self.fake_test_content,
+                        'key': str(uuid.uuid4()),
+                    }},
+                    proxy_user,
+                )
+                # The Proxy ACK must be sent in both cases of import success and failure.
+                self.assertEqual(processed['proxy_acks'], ['999999999'])
 
         # There should be one attachement with this filename
-        attachments = self.env['ir.attachment'].search([('name', '=', self.invoice_filename2)])
+        attachments = self.env['ir.attachment'].search([
+            ('name', '=', 'IT01234567890_FPR02.xml'),
+            ('res_model', '=', 'account.move'),
+            ('res_field', '=', 'l10n_it_edi_attachment_file'),
+        ])
         self.assertEqual(len(attachments), 1)
         invoices = self.env['account.move'].search([('payment_reference', '=', 'TWICE_TEST')])
         self.assertEqual(len(invoices), 1)
 
     def test_receive_bill_with_global_discount(self):
-        content = self.with_applied_xpath(
-            etree.fromstring(self.invoice_content),
-            '''
-                <xpath expr="//FatturaElettronicaBody/DatiGenerali/DatiGeneraliDocumento" position="inside">
-                    <ScontoMaggiorazione>
-                        <Tipo>SC</Tipo>
-                        <Importo>2</Importo>
-                    </ScontoMaggiorazione>
-                </xpath>
-            ''')
-        invoices = self.edi_format._create_invoice_from_xml_tree(self.invoice_filename2, content)
+        applied_xml = """
+            <xpath expr="//FatturaElettronicaBody/DatiGenerali/DatiGeneraliDocumento" position="inside">
+                <ScontoMaggiorazione>
+                    <Tipo>SC</Tipo>
+                    <Importo>2</Importo>
+                </ScontoMaggiorazione>
+            </xpath>
+        """
 
-        self.assertRecordValues(invoices, [{
-            'amount_untaxed': 3.0,
+        self._assert_import_invoice('IT01234567890_FPR01.xml', [{
+            'invoice_date': fields.Date.from_string('2014-12-18'),
+            'amount_untaxed': 5.0,
             'amount_tax': 1.1,
+            'invoice_line_ids': [
+                {
+                    'quantity': 5.0,
+                    'name': 'DESCRIZIONE DELLA FORNITURA',
+                    'price_unit': 1.0,
+                },
+            ],
+        }], applied_xml)
+
+    def test_receive_bill_with_multiple_discounts_in_line(self):
+        applied_xml = """
+            <xpath expr="//FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee[1]" position="inside">
+                <ScontoMaggiorazione>
+                    <Tipo>SC</Tipo>
+                    <Percentuale>50.00</Percentuale>
+                </ScontoMaggiorazione>
+                <ScontoMaggiorazione>
+                    <Tipo>SC</Tipo>
+                    <Percentuale>25.00</Percentuale>
+                </ScontoMaggiorazione>
+                <ScontoMaggiorazione>
+                    <Tipo>SC</Tipo>
+                    <Percentuale>20.00</Percentuale>
+                </ScontoMaggiorazione>
+            </xpath>
+
+            <xpath expr="//FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee[1]/PrezzoTotale" position="replace">
+                <PrezzoTotale>1.50</PrezzoTotale>
+            </xpath>
+        """
+
+        self._assert_import_invoice('IT01234567890_FPR01.xml', [{
+            'invoice_date': fields.Date.from_string('2014-12-18'),
+            'amount_untaxed': 1.5,
+            'amount_tax': 0.33,
+            'invoice_line_ids': [
+                {
+                    'quantity': 5.0,
+                    'name': 'DESCRIZIONE DELLA FORNITURA',
+                    'price_unit': 1.0,
+                    'discount': 70.0,
+                }
+            ],
+        }], applied_xml)
+
+    def test_receive_bill_with_discount_rounding_issue(self):
+        applied_xml = """
+            <xpath expr="//FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee[1]" position="inside">
+                <ScontoMaggiorazione>
+                    <Tipo>SC</Tipo>
+                    <Percentuale>50.00</Percentuale>
+                </ScontoMaggiorazione>
+            </xpath>
+
+            <xpath expr="//FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee[1]/PrezzoUnitario" position="replace">
+                <PrezzoUnitario>11.85</PrezzoUnitario>
+            </xpath>
+            <xpath expr="//FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee[1]/Quantita" position="replace">
+                <Quantita>3</Quantita>
+            </xpath>
+            <xpath expr="//FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee[1]/PrezzoTotale" position="replace">
+                <PrezzoTotale>17.78</PrezzoTotale>
+            </xpath>
+        """
+
+        self._assert_import_invoice('IT01234567890_FPR01.xml', [{
+            'invoice_date': fields.Date.from_string('2014-12-18'),
+            'amount_untaxed': 17.78,
+            'amount_tax': 3.91,
+            'invoice_line_ids': [
+                {
+                    'quantity': 3.0,
+                    'name': 'DESCRIZIONE DELLA FORNITURA',
+                    'price_unit': 11.85,
+                    'discount': 50.0,
+                },
+            ],
+        }], applied_xml)
+
+    def test_invoice_user_can_compute_is_self_invoice(self):
+        """Ensure that a user having only group_account_invoice can compute field l10n_it_edi_is_self_invoice"""
+        user = new_test_user(self.env, login='jag', groups='account.group_account_invoice')
+        move = self.env['account.move'].create({'move_type': 'in_invoice'})
+        move.with_user(user).read(['l10n_it_edi_is_self_invoice'])  # should not raise
+
+    def test_cron_import_bill_from_another_company_without_conflicts(self):
+        """
+        Ensure that in a multi-company environment, importing a bill containing products
+        restricted to another company does not fail due to company inconsistencies.
+        """
+        test_product = self.env['product.product'].create({
+            'name': 'Test Product',
+            'default_code': 'TEST',
+            'barcode': 'TEST',
+            'standard_price': 75.0,
+            'company_id': self.company_data['company'].id,
+        })
+        self.env['product.supplierinfo'].create({
+            'product_id': test_product.id,
+            'product_code': 'TEST',
+            'partner_id': self.company_data_2["company"].partner_id.id,
+        })
+
+        applied_xml = """
+            <xpath expr="//FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee" position="after">
+                <DettaglioLinee>
+                    <NumeroLinea>2</NumeroLinea>
+                    <CodiceArticolo>
+                        <CodiceTipo>EAN</CodiceTipo>
+                        <CodiceValore>TEST</CodiceValore>
+                    </CodiceArticolo>
+                    <Descrizione>[TEST] Test Product</Descrizione>
+                    <Quantita>1.00</Quantita>
+                    <PrezzoUnitario>5.00</PrezzoUnitario>
+                    <PrezzoTotale>5.00</PrezzoTotale>
+                    <AliquotaIVA>22.00</AliquotaIVA>
+                </DettaglioLinee>
+                <DettaglioLinee>
+                    <NumeroLinea>3</NumeroLinea>
+                    <CodiceArticolo>
+                        <CodiceTipo>INTERNAL</CodiceTipo>
+                        <CodiceValore>TEST</CodiceValore>
+                    </CodiceArticolo>
+                    <Descrizione>[TEST] Test Product</Descrizione>
+                    <Quantita>2.00</Quantita>
+                    <PrezzoUnitario>4.00</PrezzoUnitario>
+                    <PrezzoTotale>8.00</PrezzoTotale>
+                    <AliquotaIVA>22.00</AliquotaIVA>
+                </DettaglioLinee>
+            </xpath>
+        """
+
+        self._assert_import_invoice('IT01234567890_FPR01.xml', [{
+            'move_type': 'in_invoice',
+            'invoice_date': fields.Date.from_string('2014-12-18'),
+            'amount_untaxed': 18.0,
+            'amount_tax': 3.96,
+            'invoice_line_ids': [
+                {
+                    'quantity': 5.0,
+                    'price_unit': 1.0,
+                    'debit': 5.0,
+                },
+                {
+                    'product_id': False,
+                    'name': '[TEST] Test Product',
+                    'quantity': 1.0,
+                    'price_unit': 5.0,
+                    'debit': 5.0,
+                },
+                {
+                    'product_id': False,
+                    'name': '[TEST] Test Product',
+                    'quantity': 2.0,
+                    'price_unit': 4.0,
+                    'debit': 8.0,
+                },
+            ],
+        }], applied_xml)
+
+    def test_import_vendor_bill_with_ref_service_valid_tax(self):
+        """Ensure that importing vendor bill with a referenced service product, with a service tax of 22% S
+        only applies one tax on the product
+        """
+        sale_tax = self.env['account.tax'].search([('name', '=', '22%'), ('type_tax_use', '=', 'sale'), ('company_id', '=', self.company.id)])[0]
+        supplier_tax = self.env['account.tax'].search([('name', '=', '22% S'), ('type_tax_use', '=', 'purchase'), ('company_id', '=', self.company.id)])[0]
+        self.env['product.product'].create({
+            'name': 'Servizio tecnico',
+            'default_code': 'abcdefgh',
+            'type': 'service',
+            'list_price': 150.0,
+            'taxes_id': [Command.set([sale_tax.id])],
+            'supplier_taxes_id': [Command.set([supplier_tax.id])],
+        })
+
+        self._assert_import_invoice('IT01234567889_FPR03.xml', [{
+            'move_type': 'in_invoice',
+            'invoice_date': fields.Date.from_string('2014-12-18'),
+            'amount_untaxed': 25.0,
+            'amount_tax': 5.5,
         }])
-        self.assertRecordValues(invoices.invoice_line_ids, [
-            {
-                'quantity': 5.0,
-                'name': 'DESCRIZIONE DELLA FORNITURA',
-                'price_unit': 1.0,
-            },
-            {
-                'quantity': 1.0,
-                'name': 'SCONTO',
-                'price_unit': -2,
-            }
-        ])
+
+    def test_import_simplified_invoice_zero_base(self):
+        """Test the import of a xml bill where the total amount equals the tax amount (Importo == Imposta)."""
+
+        self._assert_import_invoice('IT01234567890_FPR05.xml', [{
+            'move_type': 'in_refund',
+            'amount_untaxed': 0.0,
+            'invoice_line_ids': [
+                {
+                    'name': 'IVA ANNO PRECEDENTE',
+                    'quantity': 1.0,
+                    'price_unit': 9.20,
+                },
+                {
+                    'name': 'TOTALE IMPORTO IN ADDEBITO',
+                    'quantity': 1.0,
+                    'price_unit': -9.20,
+                }
+            ],
+        }])

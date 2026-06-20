@@ -7,10 +7,16 @@
   <cbc:CreditNoteTypeCode>381</cbc:CreditNoteTypeCode>
   <cbc:Note>test narration</cbc:Note>
   <cbc:DocumentCurrencyCode>USD</cbc:DocumentCurrencyCode>
-  <cbc:BuyerReference>ref_partner_2</cbc:BuyerReference>
+  <cbc:BuyerReference>DE186775212</cbc:BuyerReference>
   <cac:OrderReference>
     <cbc:ID>ref_move</cbc:ID>
   </cac:OrderReference>
+  <cac:AdditionalDocumentReference>
+    <cbc:ID>___ignore___</cbc:ID>
+    <cbc:Attachment>
+      <cbc:EmbeddedDocumentBinaryObject>___ignore___</cbc:EmbeddedDocumentBinaryObject>
+   </cbc:Attachment>
+  </cac:AdditionalDocumentReference>
   <cac:AccountingSupplierParty>
     <cac:Party>
       <cbc:EndpointID schemeID="9930">DE257486969</cbc:EndpointID>
@@ -44,7 +50,7 @@
   </cac:AccountingSupplierParty>
   <cac:AccountingCustomerParty>
     <cac:Party>
-      <cbc:EndpointID schemeID="9930">DE186775212</cbc:EndpointID>
+      <cbc:EndpointID schemeID="0204">DE186775212</cbc:EndpointID>
       <cac:PartyName>
         <cbc:Name>partner_2</cbc:Name>
       </cac:PartyName>
@@ -71,6 +77,19 @@
       </cac:Contact>
     </cac:Party>
   </cac:AccountingCustomerParty>
+  <cac:Delivery>
+    <cbc:ActualDeliveryDate>2017-01-01</cbc:ActualDeliveryDate>
+    <cac:DeliveryLocation>
+      <cac:Address>
+        <cbc:StreetName>Europa-Park-Straße 2</cbc:StreetName>
+        <cbc:CityName>Rust</cbc:CityName>
+        <cbc:PostalZone>77977</cbc:PostalZone>
+        <cac:Country>
+          <cbc:IdentificationCode>DE</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:Address>
+    </cac:DeliveryLocation>
+  </cac:Delivery>
   <cac:PaymentMeans>
     <cbc:PaymentMeansCode name="standing agreement">57</cbc:PaymentMeansCode>
     <cbc:PaymentID>RINV/2017/01/0001</cbc:PaymentID>

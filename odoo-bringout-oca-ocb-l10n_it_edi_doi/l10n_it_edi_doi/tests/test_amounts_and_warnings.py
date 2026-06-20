@@ -124,7 +124,6 @@ class TestItEdiDoiRemaining(TestItEdiDoi):
                 "Pay attention, the threshold of your Declaration of Intent test 2019-threshold 1000 of 1,000.00\xa0€ is exceeded by 1,000.00\xa0€, this document included.\n"
                 "Invoiced: 0.00\xa0€; Not Yet Invoiced: 2,000.00\xa0€"
             )
-        with Form(order) as order_form:
             with order_form.order_line.edit(0) as line_form:
                 line_form.price_unit = 3000
                 line_form.save()
@@ -169,7 +168,7 @@ class TestItEdiDoiRemaining(TestItEdiDoi):
                     'name': 'not a declaration line',
                     'quantity': 1,
                     'price_unit': 2000.0,  # > declaration.threshold; not counted
-                    'tax_ids': [Command.set(self.company.account_sale_tax_id.ids)],
+                    'tax_ids': False,
                 }),
         ])
         # The amounts have not changed since the invoice has not been posted yet.
@@ -267,7 +266,7 @@ class TestItEdiDoiRemaining(TestItEdiDoi):
                 'name': 'none declaration line',
                 'quantity': 1,
                 'price_unit': 2000.0,  # > declaration.threshold; not counted
-                'tax_ids': [Command.set(self.company.account_sale_tax_id.ids)],
+                'tax_ids': False,
             }),
         ])
         # The amounts have not changed since the invoice has not been posted yet.
@@ -320,7 +319,7 @@ class TestItEdiDoiRemaining(TestItEdiDoi):
                 'name': 'not a declaration line',
                 'product_id': self.product_1.id,
                 'price_unit': 2000.0,  # > declaration.threshold; not counted
-                'tax_id': [Command.set(self.company.account_sale_tax_id.ids)],
+                'tax_id': False,
             }),
         ])
         independent_order.action_confirm()
@@ -341,7 +340,7 @@ class TestItEdiDoiRemaining(TestItEdiDoi):
                 'name': 'not a declaration line',
                 'product_id': self.product_1.id,
                 'price_unit': 2000.0,  # > declaration.threshold; not counted
-                'tax_id': [Command.set(self.company.account_sale_tax_id.ids)],
+                'tax_id': False,
             }),
         ])
         order.action_confirm()
@@ -351,12 +350,6 @@ class TestItEdiDoiRemaining(TestItEdiDoi):
             'remaining': -2000.0,
         }])
 
-        downpayment_product = self.env['product.product'].create({
-            'name': 'Down Payment',
-            'taxes_id': [Command.set(self.company.account_sale_tax_id.copy({'price_include': True}).ids)],
-            'type': 'service',
-        })
-        self.env['ir.config_parameter'].sudo().set_param('sale.default_deposit_product_id', downpayment_product.id)
         for i in range(2):
             self.env['sale.advance.payment.inv'].with_context({
                    'active_model': 'sale.order',
@@ -379,7 +372,7 @@ class TestItEdiDoiRemaining(TestItEdiDoi):
             "Invoiced: 500.00\xa0€; Not Yet Invoiced: 2,500.00\xa0€"
         )
 
-        invoice.invoice_line_ids.filtered(lambda l: l.tax_ids.ids == declaration_tax.ids).price_unit = 2000  # 1000 more than the sales order declaration amount
+        invoice.invoice_line_ids[0].price_unit = 2000  # 1000 more than the sales order declaration amount
         # Changing an invoice line does not affect the not yet invoiced amount of sale order lines not linked to that line
         self.assertEqual(
             invoice.l10n_it_edi_doi_warning,

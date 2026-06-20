@@ -12,7 +12,7 @@ from pytz import timezone
 class TestEsEdiTbaiCommon(AccountEdiTestCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref='l10n_es.account_chart_template_full', edi_format_ref='l10n_es_edi_tbai.edi_es_tbai'):
+    def setUpClass(cls, chart_template_ref='es_full', edi_format_ref='l10n_es_edi_tbai.edi_es_tbai'):
         super().setUpClass(chart_template_ref=chart_template_ref, edi_format_ref=edi_format_ref)
 
         cls.frozen_today = datetime(year=2025, month=1, day=1, hour=0, minute=0, second=0, tzinfo=timezone('utc'))
@@ -82,7 +82,7 @@ class TestEsEdiTbaiCommon(AccountEdiTestCommon):
         :param trailing_xml_id: The trailing tax's xml id.
         :return:                An account.tax record
         """
-        return cls.env.ref(f'l10n_es.{cls.env.company.id}_account_tax_template_{trailing_xml_id}')
+        return cls.env.ref(f'account.{cls.env.company.id}_account_tax_template_{trailing_xml_id}')
 
     @classmethod
     def create_invoice(cls, **kwargs):
@@ -136,10 +136,10 @@ class TestEsEdiTbaiCommon(AccountEdiTestCommon):
       <DetallesFactura>
         <IDDetalleFactura>
           <DescripcionDetalle>producta</DescripcionDetalle>
-          <Cantidad>5.00</Cantidad>
-          <ImporteUnitario>1000.00</ImporteUnitario>
-          <Descuento>1000.00</Descuento>
-          <ImporteTotal>4840.00</ImporteTotal>
+          <Cantidad>5.00000000</Cantidad>
+          <ImporteUnitario>1000.00000000</ImporteUnitario>
+          <Descuento>1000.00000000</Descuento>
+          <ImporteTotal>4840.00000000</ImporteTotal>
         </IDDetalleFactura>
       </DetallesFactura>
       <ImporteTotalFactura>4840.00</ImporteTotalFactura>
@@ -422,10 +422,10 @@ class TestEsEdiTbaiCommon(AccountEdiTestCommon):
       <DetallesFactura>
         <IDDetalleFactura>
           <DescripcionDetalle>producta</DescripcionDetalle>
-          <Cantidad>5.00</Cantidad>
-          <ImporteUnitario>-1000.00</ImporteUnitario>
-          <Descuento>-1000.00</Descuento>
-          <ImporteTotal>-4840.00</ImporteTotal>
+          <Cantidad>5.00000000</Cantidad>
+          <ImporteUnitario>-1000.00000000</ImporteUnitario>
+          <Descuento>-1000.00000000</Descuento>
+          <ImporteTotal>-4840.00000000</ImporteTotal>
         </IDDetalleFactura>
       </DetallesFactura>
       <ImporteTotalFactura>-4840.00</ImporteTotalFactura>
@@ -447,6 +447,92 @@ class TestEsEdiTbaiCommon(AccountEdiTestCommon):
                     <BaseImponible>-4000.00</BaseImponible>
                     <TipoImpositivo>21.00</TipoImpositivo>
                     <CuotaImpuesto>-840.00</CuotaImpuesto>
+                  </DetalleIVA>
+                </DesgloseIVA>
+              </DetalleNoExenta>
+            </NoExenta>
+          </Sujeta>
+        </Entrega>
+      </DesgloseTipoOperacion>
+    </TipoDesglose>
+  </Factura>
+  <HuellaTBAI>
+    <Software>
+      <LicenciaTBAI>___ignore___</LicenciaTBAI>
+      <EntidadDesarrolladora>
+        <NIF>___ignore___</NIF>
+      </EntidadDesarrolladora>
+      <Nombre>___ignore___</Nombre>
+      <Version>___ignore___</Version>
+    </Software>
+    <NumSerieDispositivo>___ignore___</NumSerieDispositivo>
+  </HuellaTBAI>
+</T:TicketBai>
+"""
+
+    L10N_ES_TBAI_FECHA_OPERACION = """<?xml version='1.0'?>
+<T:TicketBai xmlns:etsi="http://uri.etsi.org/01903/v1.3.2#" xmlns:T="urn:ticketbai:emision" xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+  <Cabecera>
+    <IDVersionTBAI>1.2</IDVersionTBAI>
+  </Cabecera>
+  <Sujetos>
+    <Emisor>
+      <NIF>___ignore___</NIF>
+      <ApellidosNombreRazonSocial>EUS Company</ApellidosNombreRazonSocial>
+    </Emisor>
+    <Destinatarios>
+      <IDDestinatario>
+        <IDOtro>
+          <IDType>02</IDType>
+          <ID>BE0477472701</ID>
+        </IDOtro>
+        <ApellidosNombreRazonSocial>&amp;@&#224;&#193;$&#163;&#8364;&#232;&#234;&#200;&#202;&#246;&#212;&#199;&#231;&#161;&#8539;&#8482;&#179;</ApellidosNombreRazonSocial>
+        <CodigoPostal>___ignore___</CodigoPostal>
+        <Direccion>___ignore___</Direccion>
+      </IDDestinatario>
+    </Destinatarios>
+    <VariosDestinatarios>N</VariosDestinatarios>
+    <EmitidaPorTercerosODestinatario>N</EmitidaPorTercerosODestinatario>
+  </Sujetos>
+  <Factura>
+    <CabeceraFactura>
+      <SerieFactura>INVTEST</SerieFactura>
+      <NumFactura>01</NumFactura>
+      <FechaExpedicionFactura>01-01-2025</FechaExpedicionFactura>
+      <HoraExpedicionFactura>___ignore___</HoraExpedicionFactura>
+      <FacturaSimplificada>N</FacturaSimplificada>
+    </CabeceraFactura>
+    <DatosFactura>
+      <FechaOperacion>01-01-2022</FechaOperacion>
+      <DescripcionFactura>manual</DescripcionFactura>
+      <DetallesFactura>
+        <IDDetalleFactura>
+          <DescripcionDetalle>producta</DescripcionDetalle>
+          <Cantidad>5.00000000</Cantidad>
+          <ImporteUnitario>1000.00000000</ImporteUnitario>
+          <Descuento>1000.00000000</Descuento>
+          <ImporteTotal>4840.00000000</ImporteTotal>
+        </IDDetalleFactura>
+      </DetallesFactura>
+      <ImporteTotalFactura>4840.00</ImporteTotalFactura>
+      <Claves>
+        <IDClave>
+          <ClaveRegimenIvaOpTrascendencia>01</ClaveRegimenIvaOpTrascendencia>
+        </IDClave>
+      </Claves>
+    </DatosFactura>
+    <TipoDesglose>
+      <DesgloseTipoOperacion>
+        <Entrega>
+          <Sujeta>
+            <NoExenta>
+              <DetalleNoExenta>
+                <TipoNoExenta>S1</TipoNoExenta>
+                <DesgloseIVA>
+                  <DetalleIVA>
+                    <BaseImponible>4000.00</BaseImponible>
+                    <TipoImpositivo>21.00</TipoImpositivo>
+                    <CuotaImpuesto>840.00</CuotaImpuesto>
                   </DetalleIVA>
                 </DesgloseIVA>
               </DetalleNoExenta>

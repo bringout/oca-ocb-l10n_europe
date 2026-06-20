@@ -20,6 +20,9 @@ class ResCompany(models.Model):
         for company in self:
             company.is_france_country = company.country_code in self._get_france_country_codes()
 
+    l10n_fr_rounding_difference_loss_account_id = fields.Many2one('account.account', check_company=True)
+    l10n_fr_rounding_difference_profit_account_id = fields.Many2one('account.account', check_company=True)
+
     @api.model
     def _get_france_country_codes(self):
         """Returns every country code that can be used to represent France
@@ -64,7 +67,7 @@ class ResCompany(models.Model):
             for seq_field in sequence_fields:
                 if not company[seq_field]:
                     vals = {
-                        'name': _('Securisation of %s - %s') % (seq_field, company.name),
+                        'name': _('Securisation of %s - %s', seq_field, company.name),
                         'code': 'FRSECURE%s-%s' % (company.id, seq_field),
                         'implementation': 'no_gap',
                         'prefix': '',

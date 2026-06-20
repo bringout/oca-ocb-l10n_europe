@@ -7,7 +7,7 @@ from odoo.tools.misc import formatLang
 
 class L10nItDeclarationOfIntent(models.Model):
     _name = "l10n_it_edi_doi.declaration_of_intent"
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread.main.attachment', 'mail.activity.mixin']
     _description = "Declaration of Intent"
     _order = 'protocol_number_part1, protocol_number_part2'
 
@@ -33,7 +33,7 @@ class L10nItDeclarationOfIntent(models.Model):
         string='Company',
         index=True,
         required=True,
-        default=lambda self: self.env.company,
+        default=lambda self: self.env.company._accessible_branches()[:1],
     )
 
     partner_id = fields.Many2one(
@@ -143,8 +143,10 @@ class L10nItDeclarationOfIntent(models.Model):
          "The Threshold of a Declaration of Intent must be positive."),
     ]
 
-    def name_get(self):
-        return [(record.id, f"{record.protocol_number_part1}-{record.protocol_number_part2}") for record in self]
+    @api.depends('protocol_number_part1', 'protocol_number_part2')
+    def _compute_display_name(self):
+        for record in self:
+            record.display_name = f"{record.protocol_number_part1}-{record.protocol_number_part2}"
 
     @api.depends('invoice_ids', 'invoice_ids.state', 'invoice_ids.l10n_it_edi_doi_amount')
     def _compute_invoiced(self):

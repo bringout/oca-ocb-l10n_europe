@@ -72,7 +72,7 @@
         </template>
 
         <template id="template_invoice_factura">
-            <t t-set="is_simplified" t-value="invoice._is_l10n_es_tbai_simplified()"/>
+            <t t-set="is_simplified" t-value="invoice.l10n_es_is_simplified"/>
             <CabeceraFactura>
                 <t t-set="seq_and_num" t-value="invoice._get_l10n_es_tbai_sequence_and_number()"/>
                 <SerieFactura t-out="seq_and_num[0]"/>
@@ -96,6 +96,7 @@
                     </FacturaRectificativa>
                     <FacturasRectificadasSustituidas>
                         <IDFacturaRectificadaSustituida>
+                            <!-- NOTE: could support issuing a single credit note for multiple invoices (optional) -->
                             <t t-set="seq_and_num" t-value="credit_note_invoice._get_l10n_es_tbai_sequence_and_number()"/>
                             <SerieFactura t-out="seq_and_num[0]"/>
                             <NumFactura t-out="seq_and_num[1]"/>
@@ -105,15 +106,16 @@
                 </t>
             </CabeceraFactura>
             <DatosFactura t-if="is_emission">
+                <FechaOperacion t-if="invoice.delivery_date and format_date(datetime_now) != format_date(invoice.delivery_date)" t-out="format_date(invoice.delivery_date)"/>
                 <DescripcionFactura t-out="invoice.invoice_origin and invoice.invoice_origin[:250] or 'manual'"/>
                 <DetallesFactura>
                     <IDDetalleFactura t-foreach="invoice_lines" t-as="line_values">
                         <t t-set="line" t-value="line_values['line']"/>
                         <DescripcionDetalle t-out="line_values['description']"/>
-                        <Cantidad t-out="format_float(line.quantity)"/>
-                        <ImporteUnitario t-out="format_float(line_values['unit_price'])"/>
-                        <Descuento t-out="format_float(line_values['discount'])"/>
-                        <ImporteTotal t-out="format_float(line_values['total'])"/>
+                        <Cantidad t-out="format_float(line.quantity, precision_digits=8)"/>
+                        <ImporteUnitario t-out="format_float(line_values['unit_price'], precision_digits=8)"/>
+                        <Descuento t-out="format_float(line_values['discount'], precision_digits=8)"/>
+                        <ImporteTotal t-out="format_float(line_values['total'], precision_digits=8)"/>
                     </IDDetalleFactura>
                 </DetallesFactura>
                 <ImporteTotalFactura t-out="format_float(amount_total)"/>
